@@ -70,6 +70,14 @@ export default function Init() {
     });
     }  
   });
+
+  let grooveWorker = new Worker(new URL('./workers/grooveWorker.js' , import.meta.url));
+  grooveWorker.onmessage = function (e) {
+    console.log('main thread message received', e.data);
+  }
+
+  grooveWorker.postMessage(10);
+
 }
 
 Init();

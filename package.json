@@ -13,5 +13,8 @@
   "bugs": {
     "url": "https://github.com/jonnybmc/simple-sequencer/issues"
   },
-  "homepage": "https://github.com/jonnybmc/simple-sequencer#readme"
+  "homepage": "https://github.com/jonnybmc/simple-sequencer#readme",
+  "dependencies": {
+    "@magenta/music": "^1.23.1"
+  }
 }
