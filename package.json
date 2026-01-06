@@ -1,0 +1,17 @@
+{
+  "name": "simple-sequencer",
+  "version": "1.0.0",
+  "description": "a project showcasing a simple program to build your own rhythmic drum and synth patterns",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jonnybmc/simple-sequencer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jonnybmc/simple-sequencer/issues"
+  },
+  "homepage": "https://github.com/jonnybmc/simple-sequencer#readme"
+}

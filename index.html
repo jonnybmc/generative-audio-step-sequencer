@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>JS Step Sequencer</title>
+    <style>
+        /* Minimal styling to make the grid visible */
+        body {
+            font-family: sans-serif;
+            background: #222;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #app {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 4px;
+        }
+
+        .step {
+            width: 30px;
+            height: 30px;
+            background: #444;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+
+        .step.active {
+            background: #0f0;
+            box-shadow: 0 0 10px #0f0;
+        }
+
+        .step.playing {
+            /* A faint white overlay */
+            background-color: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.05s ease;
+            /* Snappy transition */
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app"></div>
+
+    <button id="play-btn">Start Sequencer</button>
+
+    <div id="transport-controls">
+        <label for="tempo-input">Tempo</label>
+        <input
+            id="tempo-input"
+            type="number"
+            min="30"
+            max="240"
+            value="90"
+            step="1"/>
+    </div>
+    
+    <button id="clear-btn">Clear Pattern</button>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+
+</html>
