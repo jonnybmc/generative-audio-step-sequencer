@@ -20,6 +20,7 @@ const initialState = {
         isPlaying: false
     },
     steps: generateSteps(4, 16),
+    humanizeValue: 0
 };
 
 export default initialState;

@@ -1,16 +1,16 @@
-import store from "../lib/state.js"; 
+import store from "../lib/state.js";
 
-let initSteps = stepsObject => {
-     return Object.keys(stepsObject).reduce( (accumulator, currentValue) => {   //  track-0_0, track-0_1, track-0_2
-        return {
-            ...accumulator,
-            [currentValue] : {
-                ...stepsObject[currentValue],
-                active:false
-            }
-        }
-    }, {}
-    )
+let initSteps = (stepsObject) => {
+  return Object.keys(stepsObject).reduce((accumulator, currentValue) => {
+    //  track-0_0, track-0_1, track-0_2
+    return {
+      ...accumulator,
+      [currentValue]: {
+        ...stepsObject[currentValue],
+        active: false,
+      },
+    };
+  }, {});
 };
 
 export class Store {
@@ -74,6 +74,8 @@ export class Store {
           ...state,
           steps: initSteps(state.steps), //dont spread state object here as its not iteraeble
         };
+      case "SET_HUMANIZE":
+        return { ...state, humanizeValue: action.payload };
       default:
         return state;
     }
