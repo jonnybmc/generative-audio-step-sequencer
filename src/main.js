@@ -3,6 +3,7 @@ import { Store } from "./core/Store.js"; // Added .js
 import { AudioEngine } from "./core/AudioEngine.js"; // Added .js
 import { Grid } from "./components/Grid.js"; // Added .js
 import { Dial } from "./components/Dial.js";
+import { TrackControls } from "./components/TrackControls.js";
 
 const NOTE_PITCHES = { 0: 36, 1: 38, 2: 42, 3: 46 };
 
@@ -14,7 +15,7 @@ export default function Init() {
   GRID.init();
 
   new Dial(APP_STORE, "#humanize-container");
-
+  new TrackControls(APP_STORE, "#track-controls");
 
   let tempoElem = document.querySelector("#tempo-input");
   tempoElem.value = APP_STORE.getState().transport.bpm;
@@ -37,12 +38,14 @@ export default function Init() {
 let lastSteps = APP_STORE.getState().steps;
 let lastHumanize = APP_STORE.getState().humanizeValue;
 let lastBpm = APP_STORE.getState().transport.bpm;
+let lastTrackSettings = APP_STORE.getState().trackSettings;
 
 APP_STORE.subscribe(newState => {
-  // 2. Check if pattern, dial, OR tempo changed
+  // 2. Check if pattern, dial, tempo, OR track settings changed
   const stepsChanged = newState.steps !== lastSteps;
   const humanizeChanged = newState.humanizeValue !== lastHumanize;
   const bpmChanged = newState.transport.bpm !== lastBpm;
+  const trackSettingsChanged = newState.trackSettings !== lastTrackSettings;
 
   if (stepsChanged || humanizeChanged || bpmChanged) {
     console.log("Change detected! Refreshing AI groove...");
@@ -55,18 +58,33 @@ APP_STORE.subscribe(newState => {
         humanizeValue: newState.humanizeValue
       }
     });
-
-    // 3. Update trackers to current state
-    lastSteps = newState.steps;
-    lastHumanize = newState.humanizeValue;
-    lastBpm = newState.transport.bpm;
   }
+
+  // Refresh ghost notes when track settings change (separate from AI groove)
+  if (trackSettingsChanged && currentAISequence) {
+    console.log("Track settings changed! Refreshing ghost notes...");
+    const humanizeAmount = newState.humanizeValue / 100;
+    currentGhostNotes = AUDIO_ENGINE.extractGhostNotes(
+      currentAISequence,
+      newState.steps,
+      newState.transport.bpm,
+      humanizeAmount,
+      newState.trackSettings
+    );
+  }
+
+  // 3. Update trackers to current state
+  lastSteps = newState.steps;
+  lastHumanize = newState.humanizeValue;
+  lastBpm = newState.transport.bpm;
+  lastTrackSettings = newState.trackSettings;
 });
 
   function handleOnTick(currentStep, nextNoteTime) {
     let steps = APP_STORE.getState().steps;
     const humanizeAmount = APP_STORE.getState().humanizeValue / 100; // 0.0 to 1.0
     const bpm = APP_STORE.getState().transport.bpm;
+    const trackSettings = APP_STORE.getState().trackSettings;
     const stepDuration = (60 / bpm) / 4;
 
     // 1. Play the main pattern notes (kick, snare, hihats)
@@ -81,7 +99,8 @@ APP_STORE.subscribe(newState => {
           currentAISequence,
           humanizeAmount,
           NOTE_PITCHES,
-          bpm
+          bpm,
+          trackSettings
         );
         AUDIO_ENGINE.scheduleNote(time, NOTE_PITCHES[trackIndex], velocity);
       }
@@ -183,11 +202,12 @@ APP_STORE.subscribe(newState => {
           aiSequence,
           state.steps,
           state.transport.bpm,
-          humanizeAmount
+          humanizeAmount,
+          state.trackSettings
         );
 
         if (currentGhostNotes.length > 0) {
-          console.log(`Ghost hi-hats: ${currentGhostNotes.length} triplet/pocket fills added`);
+          console.log(`Ghost notes: ${currentGhostNotes.length} kick/snare ghosts added`);
         }
         break;
     }

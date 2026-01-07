@@ -53,10 +53,10 @@ self.onmessage = async function(e) {
             return;
         }
 
-        // Scale humanizeValue (1-100) to temperature (0.4-1.2)
-        // 0.4 = subtle, tight humanization
-        // 1.2 = expressive with natural variation
-        const temperature = 0.4 + (humanizeValue / 100) * 0.8;
+        // Scale humanizeValue (1-100) to temperature (0.3-1.3)
+        // 0.3 = very tight, subtle humanization
+        // 1.3 = highly expressive, maximum variation (drunk Dilla territory)
+        const temperature = 0.3 + (humanizeValue / 100) * 1.0;
 
         try {
             // Encode the quantized (robotic) sequence

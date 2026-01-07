@@ -76,6 +76,39 @@ export class Store {
         };
       case "SET_HUMANIZE":
         return { ...state, humanizeValue: action.payload };
+      case "SET_TRACK_HUMANIZE":
+        return {
+          ...state,
+          trackSettings: {
+            ...state.trackSettings,
+            [action.payload.track]: {
+              ...state.trackSettings[action.payload.track],
+              humanize: action.payload.value
+            }
+          }
+        };
+      case "TOGGLE_TRACK_SWING":
+        return {
+          ...state,
+          trackSettings: {
+            ...state.trackSettings,
+            [action.payload]: {
+              ...state.trackSettings[action.payload],
+              swingEnabled: !state.trackSettings[action.payload].swingEnabled
+            }
+          }
+        };
+      case "TOGGLE_TRACK_GHOSTS":
+        return {
+          ...state,
+          trackSettings: {
+            ...state.trackSettings,
+            [action.payload]: {
+              ...state.trackSettings[action.payload],
+              ghostsEnabled: !state.trackSettings[action.payload].ghostsEnabled
+            }
+          }
+        };
       default:
         return state;
     }
