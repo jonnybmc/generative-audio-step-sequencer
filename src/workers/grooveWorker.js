@@ -1,4 +1,24 @@
 // grooveWorker.js
+// Web worker for GrooVAE AI model processing
+
+// Message types - keep in sync with ../constants/workerMessages.js
+// (Web workers using importScripts can't use ES modules directly)
+const WORKER_MESSAGES = {
+  HUMANIZE: 'HUMANIZE',
+  READY: 'READY',
+  HUMANIZED_RESULT: 'HUMANIZED_RESULT'
+};
+
+// Drum pitches - keep in sync with ../constants/drums.js
+const DRUM_PITCHES = {
+  KICK: 36,
+  SNARE: 38,
+  HIHAT_CLOSED: 42,
+  HIHAT_OPEN: 46
+};
+
+// Track to pitch mapping
+const TRACK_TO_PITCH = { 0: 36, 1: 38, 2: 42, 3: 46 };
 
 // 1. Mocks for Environment Compatibility
 self.window = self;
@@ -19,12 +39,12 @@ const model = new music_vae.MusicVAE(HUMANIZE_CHECKPOINT);
 
 model.initialize().then(() => {
     console.log("Worker: GrooVAE Humanize model is ready!");
-    self.postMessage({ type: 'READY' });
+    self.postMessage({ type: WORKER_MESSAGES.READY });
 });
 
 // 4. Main Message Handler
 self.onmessage = async function(e) {
-    if (e.data.type === 'HUMANIZE') {
+    if (e.data.type === WORKER_MESSAGES.HUMANIZE) {
         const { bpm, steps, humanizeValue = 0 } = e.data.payload;
 
         const rawSeq = inflateStepsToSequence(steps, bpm);
@@ -33,7 +53,7 @@ self.onmessage = async function(e) {
         if (rawSeq.notes.length === 0) {
             console.warn("Worker: No notes found. Skipping AI inference.");
             self.postMessage({
-                type: 'HUMANIZED_RESULT',
+                type: WORKER_MESSAGES.HUMANIZED_RESULT,
                 payload: rawSeq
             });
             return;
@@ -47,7 +67,7 @@ self.onmessage = async function(e) {
         if (humanizeValue === 0) {
             console.log("Worker: Humanize at 0% - returning rigid/quantized sequence");
             self.postMessage({
-                type: 'HUMANIZED_RESULT',
+                type: WORKER_MESSAGES.HUMANIZED_RESULT,
                 payload: quantizedSeq
             });
             return;
@@ -90,14 +110,14 @@ self.onmessage = async function(e) {
             });
 
             self.postMessage({
-                type: 'HUMANIZED_RESULT',
+                type: WORKER_MESSAGES.HUMANIZED_RESULT,
                 payload: outputSeq
             });
         } catch (error) {
             console.error("Worker: Humanization failed:", error);
             // Fallback to quantized sequence
             self.postMessage({
-                type: 'HUMANIZED_RESULT',
+                type: WORKER_MESSAGES.HUMANIZED_RESULT,
                 payload: quantizedSeq
             });
         }
@@ -106,9 +126,8 @@ self.onmessage = async function(e) {
 
 // 5. The "Inflation" Translator
 function inflateStepsToSequence(steps, bpm) {
-    const stepDuration = (60 / bpm) / 4; 
+    const stepDuration = (60 / bpm) / 4;
     const notes = [];
-    const pitchMap = { 0: 36, 1: 38, 2: 42, 3: 46 };
 
     Object.keys(steps).forEach(id => {
         if (steps[id].active) {
@@ -117,7 +136,7 @@ function inflateStepsToSequence(steps, bpm) {
             const stepIdx = parseInt(stepPart);
 
             notes.push({
-                pitch: pitchMap[trackIdx],
+                pitch: TRACK_TO_PITCH[trackIdx],
                 startTime: stepIdx * stepDuration,
                 endTime: (stepIdx + 1) * stepDuration,
                 velocity: 100 // AI will override this in the result

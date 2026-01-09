@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>JS Step Sequencer</title>
+    <!-- Critical CSS - inlined for fast initial render -->
     <style>
-        /* Minimal styling to make the grid visible */
         body {
             font-family: sans-serif;
             background: #222;
@@ -18,13 +18,11 @@
             height: 100vh;
             margin: 0;
         }
-
         #app {
             display: grid;
             grid-template-columns: repeat(16, 1fr);
             gap: 4px;
         }
-
         .step {
             width: 30px;
             height: 30px;
@@ -33,157 +31,10 @@
             cursor: pointer;
             border: 1px solid transparent;
         }
-
-        .step.active {
-            background: #0f0;
-            box-shadow: 0 0 10px #0f0;
-        }
-
-        .step.playing {
-            /* A faint white overlay */
-            background-color: rgba(255, 255, 255, 0.15);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            transition: all 0.05s ease;
-            /* Snappy transition */
-        }
-
-        /* Per-track controls */
-        #track-controls {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-top: 20px;
-            padding: 12px;
-            background: #333;
-            border-radius: 8px;
-            font-size: 12px;
-        }
-
-        #track-controls h3 {
-            margin: 0 0 8px 0;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #888;
-        }
-
-        .track-control {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 6px 0;
-            border-bottom: 1px solid #444;
-        }
-
-        .track-control:last-child {
-            border-bottom: none;
-        }
-
-        .track-label {
-            width: 60px;
-            font-weight: bold;
-            color: #ccc;
-        }
-
-        .track-slider-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .track-humanize {
-            width: 80px;
-            height: 6px;
-            -webkit-appearance: none;
-            appearance: none;
-            background: #555;
-            border-radius: 3px;
-            cursor: pointer;
-        }
-
-        .track-humanize:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        .track-humanize::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #0f0;
-            cursor: pointer;
-        }
-
-        .track-humanize:disabled::-webkit-slider-thumb {
-            background: #666;
-            cursor: not-allowed;
-        }
-
-        .track-humanize::-moz-range-thumb {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #0f0;
-            cursor: pointer;
-            border: none;
-        }
-
-        .track-humanize:disabled::-moz-range-thumb {
-            background: #666;
-            cursor: not-allowed;
-        }
-
-        /* Slider value - always matches slider position */
-        .track-value {
-            width: 40px;
-            text-align: right;
-            color: #ccc;
-            font-size: 12px;
-            font-family: monospace;
-        }
-
-        /* Effective value - only shown when useful (Main > 0 AND reduced) */
-        .track-effective {
-            width: 55px;
-            font-size: 11px;
-            color: #0f0;
-            font-family: monospace;
-            opacity: 0;
-            transition: opacity 0.15s;
-        }
-
-        .track-effective.show {
-            opacity: 1;
-        }
-
-        .track-toggle {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
-            color: #888;
-            font-size: 11px;
-        }
-
-        .track-toggle input {
-            cursor: pointer;
-        }
-
-        .track-toggle.enabled {
-            color: #0f0;
-        }
-
-        /* Bypassed track row - grayed out */
-        .track-control.bypassed {
-            opacity: 0.5;
-        }
-
-        .track-control.bypassed .track-label {
-            color: #666;
-        }
     </style>
+    <!-- Non-critical CSS - loaded async -->
+    <link rel="stylesheet" href="./src/main.css" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="./src/main.css"></noscript>
 </head>
 
 <body>

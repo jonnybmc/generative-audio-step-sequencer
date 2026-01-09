@@ -31,6 +31,25 @@ export class Store {
     };
   }
 
+  /**
+   * Subscribe to changes in a specific slice of state
+   * Only fires callback when the selected value changes
+   * @param {Function} selector - Function that extracts the value to watch (e.g., state => state.transport.bpm)
+   * @param {Function} callback - Called with (newValue, oldValue) when selected value changes
+   * @returns {Function} Unsubscribe function
+   */
+  subscribeToSelector(selector, callback) {
+    let lastValue = selector(this.state);
+    return this.subscribe((newState) => {
+      const newValue = selector(newState);
+      if (newValue !== lastValue) {
+        const oldValue = lastValue;
+        lastValue = newValue;
+        callback(newValue, oldValue);
+      }
+    });
+  }
+
   dispatch(action) {
     let newState = this.reducer(this.state, action);
 

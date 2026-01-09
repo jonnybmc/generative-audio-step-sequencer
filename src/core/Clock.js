@@ -17,14 +17,14 @@ export class Clock {
         this.onTick = onTick;
 
         //config
-        this.lookahead = 25.0 // call scheduler every 25 miulliseconds
-        this.scheduleAheadTime = 0.1  // scheduler time for when to schedule the next note of audio on the hardware thread
+        this.lookahead = 25.0 
+        this.scheduleAheadTime = 0.1  
 
         //state
-        this.currentStep = 0; //all 16th notes (0 -15)
-        this.nextNoteTime = 0.0; // A variable where we calculate: "When should the next kick drum happen?"
-        this.isPlaying = false; // start step sequencer in a paused state
-        this.timerID = null; //init a reference to the scheduler while loop
+        this.currentStep = 0; 
+        this.nextNoteTime = 0.0; 
+        this.isPlaying = false; 
+        this.timerID = null; 
     }
 
     start() {
