@@ -6,23 +6,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>JS Step Sequencer</title>
+
+    <!-- Preload Rive runtime and animation for faster rendering -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.34.0/+esm" as="script" crossorigin="anonymous">
+    <link rel="preload" href="./public/3dModels/head_bob.riv" as="fetch" crossorigin="anonymous">
     <!-- Critical CSS - inlined for fast initial render -->
     <style>
         body {
             font-family: sans-serif;
             background: #222;
             color: white;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
             margin: 0;
+            overflow: hidden;
         }
+
         #app {
             display: grid;
             grid-template-columns: repeat(16, 1fr);
             gap: 4px;
+            flex-shrink: 0;
         }
+
         .step {
             width: 30px;
             height: 30px;
@@ -34,26 +38,40 @@
     </style>
     <!-- Non-critical CSS - loaded async -->
     <link rel="stylesheet" href="./src/main.css" media="print" onload="this.media='all'">
-    <noscript><link rel="stylesheet" href="./src/main.css"></noscript>
+    <noscript>
+        <link rel="stylesheet" href="./src/main.css">
+    </noscript>
 </head>
 
 <body>
-    <div id="app"></div>
-
-    <button id="play-btn">Start Sequencer</button>
-
-    <div id="transport-controls">
-        <label for="tempo-input">Tempo</label>
-        <input id="tempo-input" type="number" min="30" max="240" value="90" step="1" />
+    <div class="app-container">
+        <main class="main-content">
+            <div id="app"></div>
+            <canvas id="avatar-canvas"></canvas>
+            <div id="track-controls"></div>
+        </main>
+        <footer class="transport-bar">
+            <div class="transport-left">
+                <button id="play-btn">Start Sequencer</button>
+                <div id="transport-controls">
+                    <label for="tempo-input">Tempo</label>
+                    <input id="tempo-input" type="number" min="30" max="240" value="90" step="1" />
+                </div>
+                <button id="clear-btn">Clear Pattern</button>
+            </div>
+            <div id="humanize-container"></div>
+        </footer>
     </div>
 
-    <div id="humanize-container"></div>
-
-    <div id="track-controls"></div>
-
-    <button id="clear-btn">Clear Pattern</button>
-
     <script type="module" src="./src/main.js"></script>
+    <script type="importmap">
+  {
+    "imports": {
+      "@rive-app/canvas": "https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.34.0/+esm"
+    }
+  }
+</script>
+
 </body>
 
 </html>

@@ -5,6 +5,7 @@ import { GrooveController } from "./core/GrooveController.js";
 import { Grid } from "./components/Grid.js";
 import { Dial } from "./components/Dial.js";
 import { TrackControls } from "./components/TrackControls.js";
+import { RiveAvatar } from "./components/RiveAvatar.js";
 
 export default function Init() {
   // Initialize core modules
@@ -18,6 +19,10 @@ export default function Init() {
 
   new Dial(APP_STORE, "#humanize-container");
   new TrackControls(APP_STORE, "#track-controls");
+
+  const Avatar = new RiveAvatar("#avatar-canvas");
+  Avatar.init();
+
 
   // Initialize tempo input
   const tempoElem = document.querySelector("#tempo-input");
@@ -53,7 +58,9 @@ export default function Init() {
   });
 
   // Play button handler
-  document.querySelector("#play-btn").addEventListener("click", async () => {
+  const playBtn = document.querySelector("#play-btn");
+
+  playBtn.addEventListener("click", async () => {
     const isPlaying = APP_STORE.getState().transport.isPlaying;
 
     APP_STORE.dispatch({
@@ -62,6 +69,8 @@ export default function Init() {
 
     if (isPlaying) {
       CLOCK.stop();
+      Avatar.pause();
+      playBtn.textContent = "Start Sequencer";
     } else {
       // Wake up the audio context (browsers suspend it by default)
       await audioCtx.resume();
@@ -70,8 +79,10 @@ export default function Init() {
       // Load drum samples (only loads once, subsequent calls are no-op)
       await AUDIO_ENGINE.loadSamples();
 
-      // Start the Clock
+      // Start the Clock and Avatar animation
       CLOCK.start();
+      Avatar.play();
+      playBtn.textContent = "Stop Sequencer";
     }
   });
 }

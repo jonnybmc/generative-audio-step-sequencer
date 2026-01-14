@@ -115,6 +115,15 @@ export class Dial {
     // Update local value and visuals immediately
     this.value = Math.round((normalizedAngle / 270) * 100);
     this.updateVisuals();
+
+    // we need to dispatch a custom event that will bypass the store and update the Rive 3d model in real time.
+    const fastEvent = new CustomEvent(
+      'dial-update', {
+        detail: {
+          intensity: this.value
+        }
+      });
+    window.dispatchEvent(fastEvent);
   }
 
   handleMouseUp() {

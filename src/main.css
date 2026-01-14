@@ -3,6 +3,87 @@
  * These styles are loaded async and don't block initial render
  */
 
+/* App Layout */
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.main-content {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 40px;
+}
+
+/* Avatar Canvas */
+#avatar-canvas {
+    width: 280px;
+    height: 280px;
+    flex-shrink: 0;
+}
+
+/* Transport Bar */
+.transport-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0;
+    border-top: 1px solid #444;
+    gap: 20px;
+}
+
+.transport-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+#transport-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#transport-controls label {
+    color: #888;
+    font-size: 12px;
+}
+
+#transport-controls input {
+    width: 60px;
+    padding: 6px 8px;
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: white;
+    font-size: 14px;
+}
+
+#play-btn, #clear-btn {
+    padding: 10px 20px;
+    background: #444;
+    border: 1px solid #666;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.15s;
+}
+
+#play-btn:hover, #clear-btn:hover {
+    background: #555;
+}
+
+/* Humanize Dial */
+#humanize-container {
+    flex-shrink: 0;
+}
+
 /* Step interaction states */
 .step.active {
     background: #0f0;
@@ -15,16 +96,18 @@
     transition: all 0.05s ease;
 }
 
-/* Per-track controls (below-the-fold) */
+/* Per-track controls */
 #track-controls {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    margin-top: 20px;
     padding: 12px;
     background: #333;
     border-radius: 8px;
     font-size: 12px;
+    max-height: 280px;
+    overflow-y: auto;
+    flex-shrink: 0;
 }
 
 #track-controls h3 {
