@@ -10,30 +10,54 @@
     <!-- Preload Rive runtime and animation for faster rendering -->
     <link rel="preload" href="https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.34.0/+esm" as="script" crossorigin="anonymous">
     <link rel="preload" href="./public/3dModels/head_bob.riv" as="fetch" crossorigin="anonymous">
-    <!-- Critical CSS - inlined for fast initial render -->
+    <!-- Critical CSS - inlined for fast initial render (TR-909 Theme) -->
     <style>
+        :root {
+            --tr909-silver: #c8c8c8;
+            --tr909-silver-light: #d4d4d4;
+            --tr909-panel-dark: #3d3d3d;
+            --tr909-orange: #ff6a00;
+            --tr909-button: #e8e4dc;
+            --tr909-button-shadow: #b8b4ac;
+            --tr909-button-highlight: #f5f2ec;
+        }
+
         body {
-            font-family: sans-serif;
-            background: #222;
-            color: white;
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(180deg, var(--tr909-silver-light) 0%, var(--tr909-silver) 100%);
+            color: #2a2a2a;
             margin: 0;
             overflow: hidden;
         }
 
         #app {
-            display: grid;
-            grid-template-columns: repeat(16, 1fr);
+            display: flex;
+            flex-direction: column;
             gap: 4px;
-            flex-shrink: 0;
+            padding: 16px;
+            background: #2d2d2d;
+            border-radius: 6px;
+        }
+
+        .track-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .track-steps {
+            display: flex;
+            gap: 6px;
         }
 
         .step {
-            width: 30px;
-            height: 30px;
-            background: #444;
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(180deg, var(--tr909-button-highlight) 0%, var(--tr909-button) 40%, var(--tr909-button-shadow) 100%);
             border-radius: 4px;
             cursor: pointer;
-            border: 1px solid transparent;
+            border: none;
+            box-shadow: 0 3px 0 #888, 0 4px 6px rgba(0,0,0,0.3);
         }
     </style>
     <!-- Non-critical CSS - loaded async -->
@@ -48,7 +72,6 @@
         <main class="main-content">
             <div id="app"></div>
             <canvas id="avatar-canvas"></canvas>
-            <div id="track-controls"></div>
         </main>
         <footer class="transport-bar">
             <div class="transport-left">

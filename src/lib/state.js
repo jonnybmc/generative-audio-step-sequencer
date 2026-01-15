@@ -47,15 +47,14 @@ const initialState = {
     },
     steps: generateSteps(4, 16),
     humanizeValue: 0,
-    // Per-track humanize settings
-    // humanize: 0-100 (multiplier against main dial)
-    // swingEnabled: if false, track stays on-grid regardless of main dial
-    // ghostsEnabled: if false, no ghost notes for this track
+    // Per-track settings
+    // swingLocked: if true, track stays on-grid regardless of humanize dial
+    // ghostQuantity: 0-100 (controls density of ghost notes, independent of humanize dial)
     trackSettings: {
-        0: { humanize: 100, swingEnabled: true, ghostsEnabled: true },  // Kick
-        1: { humanize: 100, swingEnabled: true, ghostsEnabled: true },  // Snare
-        2: { humanize: 100, swingEnabled: true, ghostsEnabled: false }, // Hi-hat closed (uses AM instead)
-        3: { humanize: 100, swingEnabled: true, ghostsEnabled: false }  // Hi-hat open
+        0: { swingLocked: false, ghostQuantity: 0 },   // Kick: unlocked, no ghosts
+        1: { swingLocked: false, ghostQuantity: 50 },  // Snare: unlocked, 50% ghosts
+        2: { swingLocked: false, ghostQuantity: 0 },   // Hi-hat closed: unlocked, no ghosts
+        3: { swingLocked: false, ghostQuantity: 0 }    // Hi-hat open: unlocked, no ghosts
     }
 };
 

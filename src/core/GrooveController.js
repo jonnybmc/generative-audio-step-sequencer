@@ -142,6 +142,40 @@ export class GrooveController {
   }
 
   /**
+   * Map MIDI pitch back to track index
+   * @param {number} pitch - MIDI pitch value
+   * @returns {number} Track index (0-3) or -1 if not found
+   */
+  getTrackFromPitch(pitch) {
+    for (let i = 0; i < 4; i++) {
+      if (TRACK_TO_PITCH[i] === pitch) return i;
+    }
+    return -1;
+  }
+
+  /**
+   * Schedule visual sync event for snare hits
+   * @param {number} snareTime - AudioContext time when snare plays
+   */
+  scheduleSnareVisual(snareTime) {
+    const now = this.audioEngine.audioContext.currentTime;
+    const VISUAL_LATENCY_COMPENSATION = 50; // Fire visual 50ms early to account for render lag
+    const delayMs = (snareTime - now) * 1000 - VISUAL_LATENCY_COMPENSATION;
+
+    console.log(`Scheduling snare visual in ${delayMs.toFixed(0)}ms (compensated)`);
+
+    if (delayMs > 0) {
+      setTimeout(() => {
+        console.log("Dispatching snare-hit event");
+        window.dispatchEvent(new CustomEvent('snare-hit'));
+      }, delayMs);
+    } else {
+      // Fire immediately if delay is too short
+      window.dispatchEvent(new CustomEvent('snare-hit'));
+    }
+  }
+
+  /**
    * Handle a clock tick - plays notes for the current step
    * @param {number} currentStep - Current sequencer step (0-15)
    * @param {number} nextNoteTime - AudioContext time for the next note
@@ -168,16 +202,35 @@ export class GrooveController {
           trackSettings
         );
         this.audioEngine.scheduleNote(time, TRACK_TO_PITCH[trackIndex], velocity);
+
+        // Schedule visual sync for snare hits (trackIndex 1)
+        if (trackIndex === 1) {
+          console.log(`Snare active on step ${currentStep}`);
+          this.scheduleSnareVisual(time);
+        }
       }
     });
 
     // 2. Play ghost notes for this step
+    // Ghost notes always have minimum 30% offset to preserve syncopation character
+    // If track is swing-locked, use minimum offset only (not scaled by humanize dial)
     if (this.currentGhostNotes.length > 0) {
+      const MIN_OFFSET_RATIO = 0.3;
+
       const ghostsForThisStep = this.currentGhostNotes.filter(g => g.step === currentStep);
       ghostsForThisStep.forEach(ghost => {
+        // Check if this ghost's track is swing-locked
+        const trackIndex = this.getTrackFromPitch(ghost.pitch);
+        const isSwingLocked = trackSettings?.[trackIndex]?.swingLocked ?? false;
+
+        // If track is locked, use minimum offset; otherwise scale with humanize
+        const effectiveOffsetRatio = isSwingLocked
+          ? MIN_OFFSET_RATIO
+          : Math.max(MIN_OFFSET_RATIO, humanizeAmount);
+
         const expectedGridTime = ghost.step * stepDuration;
         const ghostOffset = ghost.startTime - expectedGridTime;
-        const ghostTime = nextNoteTime + (ghostOffset * humanizeAmount);
+        const ghostTime = nextNoteTime + (ghostOffset * effectiveOffsetRatio);
 
         this.audioEngine.scheduleNote(ghostTime, ghost.pitch, ghost.velocity);
       });

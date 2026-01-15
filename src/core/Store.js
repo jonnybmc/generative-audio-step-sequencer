@@ -95,36 +95,25 @@ export class Store {
         };
       case "SET_HUMANIZE":
         return { ...state, humanizeValue: action.payload };
-      case "SET_TRACK_HUMANIZE":
+      case "SET_TRACK_GHOST_QUANTITY":
         return {
           ...state,
           trackSettings: {
             ...state.trackSettings,
             [action.payload.track]: {
               ...state.trackSettings[action.payload.track],
-              humanize: action.payload.value
+              ghostQuantity: action.payload.value
             }
           }
         };
-      case "TOGGLE_TRACK_SWING":
+      case "TOGGLE_TRACK_SWING_LOCK":
         return {
           ...state,
           trackSettings: {
             ...state.trackSettings,
             [action.payload]: {
               ...state.trackSettings[action.payload],
-              swingEnabled: !state.trackSettings[action.payload].swingEnabled
-            }
-          }
-        };
-      case "TOGGLE_TRACK_GHOSTS":
-        return {
-          ...state,
-          trackSettings: {
-            ...state.trackSettings,
-            [action.payload]: {
-              ...state.trackSettings[action.payload],
-              ghostsEnabled: !state.trackSettings[action.payload].ghostsEnabled
+              swingLocked: !state.trackSettings[action.payload].swingLocked
             }
           }
         };

@@ -82,10 +82,10 @@ export function quantizeToMPCTicks(offsetSeconds, bpm) {
  * Calculate push/pull offset based on instrument type
  * Kick DRAGS (late), Snare ANCHORS (on-grid/early)
  * @param {number} pitch - MIDI pitch of the instrument
- * @param {number} effectiveHumanize - Combined humanize amount (0-1)
+ * @param {number} humanizeAmount - Combined humanize amount (0-1)
  * @returns {number} Offset in seconds
  */
-export function getPushPullOffset(pitch, effectiveHumanize) {
+export function getPushPullOffset(pitch, humanizeAmount) {
   let offset = 0;
 
   if (pitch === DRUM_PITCHES.KICK) {
@@ -94,12 +94,12 @@ export function getPushPullOffset(pitch, effectiveHumanize) {
     const maxDragMs = 45;
     const minDragMs = 15;
     const dragRange = maxDragMs - minDragMs;
-    const baseDrag = (minDragMs + (dragRange * effectiveHumanize)) / 1000;
+    const baseDrag = (minDragMs + (dragRange * humanizeAmount)) / 1000;
     // Add random variation (±20%)
     offset = baseDrag * (0.8 + Math.random() * 0.4);
   } else if (pitch === DRUM_PITCHES.SNARE) {
     // SNARE: On-grid or slightly EARLY (negative offset = anchor/rush)
-    const maxRushMs = 10 * effectiveHumanize;
+    const maxRushMs = 10 * humanizeAmount;
     offset = -(Math.random() * maxRushMs) / 1000;
   }
   // Hi-hats: No push/pull offset - stay rigid for FRICTION
@@ -116,26 +116,21 @@ export function getPushPullOffset(pitch, effectiveHumanize) {
  * @param {number} humanizeAmount - Blend amount (0.0 = grid, 1.0 = full AI groove)
  * @param {Object} pitchMap - Map of track index to MIDI pitch
  * @param {number} bpm - Current tempo
- * @param {Object} trackSettings - Per-track humanize settings (optional)
+ * @param {Object} trackSettings - Per-track settings (swingLocked bypasses humanization)
  * @returns {Object} { time: number, velocity: number }
  */
 export function getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humanizeAmount, pitchMap, bpm, trackSettings = null) {
   const defaultVelocity = 100;
   const targetPitch = pitchMap[trackIdx];
 
-  // Get per-track settings (with defaults)
-  const settings = trackSettings?.[trackIdx] || { humanize: 100, swingEnabled: true };
-
-  // If swing is bypassed for this track, return grid time
-  if (!settings.swingEnabled) {
+  // Check if track has swing locked - return grid time if so
+  const isSwingLocked = trackSettings?.[trackIdx]?.swingLocked ?? false;
+  if (isSwingLocked) {
     return { time: baseTime, velocity: defaultVelocity };
   }
 
-  // Calculate EFFECTIVE humanize for this track
-  const effectiveHumanize = humanizeAmount * (settings.humanize / 100);
-
   // Safety check - return grid time at 0% humanize
-  if (effectiveHumanize === 0) {
+  if (humanizeAmount === 0) {
     return { time: baseTime, velocity: defaultVelocity };
   }
 
@@ -144,13 +139,13 @@ export function getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humani
   const swingMultiplier = TRACK_SWING_MULTIPLIERS[targetPitch] || 0.5;
 
   // 1. Push/Pull: Dilla "Drunk" Formula
-  const pushPullOffset = getPushPullOffset(targetPitch, effectiveHumanize);
+  const pushPullOffset = getPushPullOffset(targetPitch, humanizeAmount);
 
   // 2. Tuplet swing (apply only to off-beat steps)
   let tupletSwing = 0;
   if (stepIdx % 2 === 1) {
-    const baseTupletOffset = getTupletOffset(stepDuration, effectiveHumanize);
-    const easedHumanize = 1 - Math.pow(1 - effectiveHumanize, 3);
+    const baseTupletOffset = getTupletOffset(stepDuration, humanizeAmount);
+    const easedHumanize = 1 - Math.pow(1 - humanizeAmount, 3);
     tupletSwing = baseTupletOffset * easedHumanize * swingMultiplier * 0.15;
   }
 
@@ -164,12 +159,12 @@ export function getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humani
     });
 
     if (aiNote) {
-      aiOffset = (aiNote.startTime - expectedGridTime) * effectiveHumanize * swingMultiplier;
+      aiOffset = (aiNote.startTime - expectedGridTime) * humanizeAmount * swingMultiplier;
     }
   }
 
   // 4. Micro-variation (human inconsistency)
-  const microVariation = getMicroVariation(effectiveHumanize) * swingMultiplier;
+  const microVariation = getMicroVariation(humanizeAmount) * swingMultiplier;
 
   // 5. Combine all timing offsets
   const rawOffset = pushPullOffset + aiOffset + tupletSwing + microVariation;
@@ -185,18 +180,18 @@ export function getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humani
     const isDownbeat = (stepIdx % 4 === 0);
     const isUpbeat = (stepIdx % 4 === 2);
 
-    if (effectiveHumanize === 0) {
+    if (humanizeAmount === 0) {
       finalVelocity = defaultVelocity;
     } else if (isDownbeat) {
-      finalVelocity = 100 + (effectiveHumanize * 27);
+      finalVelocity = 100 + (humanizeAmount * 27);
     } else if (isUpbeat) {
-      finalVelocity = 70 - (effectiveHumanize * 20);
+      finalVelocity = 70 - (humanizeAmount * 20);
     } else {
-      finalVelocity = 60 - (effectiveHumanize * 20);
+      finalVelocity = 60 - (humanizeAmount * 20);
     }
 
     // Add Gaussian variation for natural feel
-    finalVelocity += gaussianRandom() * 10 * effectiveHumanize;
+    finalVelocity += gaussianRandom() * 10 * humanizeAmount;
   }
 
   return {

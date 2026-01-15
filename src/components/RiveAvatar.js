@@ -33,8 +33,16 @@ export class RiveAvatar {
           this.riveInstance.pause("GrooveMachine");
         }, 50);
 
+        // Set initial intensity to 0 (matches dial default)
+        this.setIntensity(0);
+
         window.addEventListener("dial-update", (e) => {
           this.setIntensity(e.detail.intensity);
+        });
+
+        // Listen for snare hits to punch intensity
+        window.addEventListener("snare-hit", () => {
+          this.punchIntensity();
         });
       },
     });
@@ -59,6 +67,24 @@ export class RiveAvatar {
     if (this.intensityInput) {
       this.intensityInput.value = value;
     }
+  }
+
+  punchIntensity() {
+    if (!this.intensityInput) {
+      console.warn("punchIntensity: no intensityInput");
+      return;
+    }
+
+    const baseValue = this.intensityInput.value;
+    const punchValue = 100;  // Always punch to max for groove_high
+
+    console.log(`Snare punch: ${baseValue} → ${punchValue}`);
+
+    this.intensityInput.value = punchValue;
+
+    setTimeout(() => {
+      this.intensityInput.value = baseValue;
+    }, 500);  // Long enough to catch the "down" frame in the animation cycle
   }
 
   play() {

@@ -4,7 +4,6 @@ import { AudioEngine } from "./core/AudioEngine.js";
 import { GrooveController } from "./core/GrooveController.js";
 import { Grid } from "./components/Grid.js";
 import { Dial } from "./components/Dial.js";
-import { TrackControls } from "./components/TrackControls.js";
 import { RiveAvatar } from "./components/RiveAvatar.js";
 
 export default function Init() {
@@ -18,7 +17,6 @@ export default function Init() {
   GRID.init();
 
   new Dial(APP_STORE, "#humanize-container");
-  new TrackControls(APP_STORE, "#track-controls");
 
   const Avatar = new RiveAvatar("#avatar-canvas");
   Avatar.init();
@@ -55,6 +53,11 @@ export default function Init() {
         payload: tempoVal,
       });
     }
+  });
+
+  // Clear pattern button handler
+  document.querySelector("#clear-btn").addEventListener("click", () => {
+    APP_STORE.dispatch({ type: "RESET_STEPS" });
   });
 
   // Play button handler
