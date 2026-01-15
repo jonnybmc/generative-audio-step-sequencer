@@ -100,8 +100,9 @@ export class AudioEngine {
    * @param {number} time - AudioContext time to play the note
    * @param {number} pitch - MIDI pitch number
    * @param {number} velocity - MIDI velocity (0-127), defaults to 100
+   * @param {number} sampleStartOffset - Offset into sample buffer in seconds (for micro-chops)
    */
-  scheduleNote(time, pitch, velocity = 100) {
+  scheduleNote(time, pitch, velocity = 100, sampleStartOffset = 0) {
     const sampleName = this.pitchToSample[pitch];
     const sample = sampleName ? this.samples[sampleName] : null;
 
@@ -110,7 +111,7 @@ export class AudioEngine {
     const gain = Math.pow(normalizedVelocity, 1.5); // Exponential curve for natural dynamics
 
     if (sample) {
-      this.playSample(sample, time, gain, velocity);
+      this.playSample(sample, time, gain, velocity, sampleStartOffset);
     } else {
       // Fallback to oscillator if sample not loaded
       this.playOscillator(time, pitch, gain);
@@ -125,8 +126,9 @@ export class AudioEngine {
    * @param {number} time - AudioContext time to start
    * @param {number} gain - Gain level (0.0-1.0)
    * @param {number} velocity - MIDI velocity (1-127) for filter mapping
+   * @param {number} sampleStartOffset - Offset into buffer in seconds (for micro-chops)
    */
-  playSample(buffer, time, gain, velocity = 100) {
+  playSample(buffer, time, gain, velocity = 100, sampleStartOffset = 0) {
     const source = this.audioContext.createBufferSource();
     const gainNode = this.audioContext.createGain();
     const filterNode = this.audioContext.createBiquadFilter();
@@ -156,7 +158,9 @@ export class AudioEngine {
       gainNode.disconnect();
     };
 
-    source.start(time);
+    // Start playback with optional offset into sample (for micro-chops)
+    // Second parameter is offset into buffer in seconds
+    source.start(time, sampleStartOffset);
   }
 
   /**
@@ -194,11 +198,11 @@ export class AudioEngine {
   }
 
   // Re-export methods from extracted modules for backwards compatibility
-  getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humanizeAmount, pitchMap, bpm, trackSettings = null) {
-    return getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humanizeAmount, pitchMap, bpm, trackSettings);
+  getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humanizeAmount, pitchMap, bpm, trackSettings = null, hihatMode = 'friction') {
+    return getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humanizeAmount, pitchMap, bpm, trackSettings, hihatMode);
   }
 
-  extractGhostNotes(aiSequence, originalSteps, bpm, humanizeAmount, trackSettings = null) {
-    return extractGhostNotes(aiSequence, originalSteps, bpm, humanizeAmount, trackSettings);
+  extractGhostNotes(aiSequence, originalSteps, bpm, humanizeAmount, trackSettings = null, hihatMode = 'friction') {
+    return extractGhostNotes(aiSequence, originalSteps, bpm, humanizeAmount, trackSettings, hihatMode);
   }
 }

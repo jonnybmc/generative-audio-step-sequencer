@@ -117,6 +117,14 @@ export class Store {
             }
           }
         };
+      case "SET_HIHAT_MODE":
+        return {
+          ...state,
+          grooveSettings: {
+            ...state.grooveSettings,
+            hihatMode: action.payload  // 'friction' | 'limp'
+          }
+        };
       default:
         return state;
     }

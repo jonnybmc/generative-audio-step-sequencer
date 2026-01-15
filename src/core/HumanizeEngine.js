@@ -8,6 +8,15 @@ import { DRUM_PITCHES } from '../constants/drums.js';
 import { gaussianRandom } from './MathUtils.js';
 
 /**
+ * MAX_BPM Ceiling for timing calculations
+ * At higher tempos, timing offsets (+15-45ms) become a smaller percentage of beat duration,
+ * reducing the psychoacoustic "rub" effect. Cap at 96 BPM for consistent groove character.
+ * The sequencer still plays at user's tempo, but timing math uses effective BPM.
+ * (Producer feedback: 00:13:23)
+ */
+export const DILLA_MAX_BPM = 96;
+
+/**
  * Per-track swing multipliers - based on Dilla/MPC analysis
  * Kick swings hardest (it's the "drunk" element)
  * Hi-hats stay RIGID to create friction against lazy kick
@@ -17,6 +26,30 @@ export const TRACK_SWING_MULTIPLIERS = {
   [DRUM_PITCHES.SNARE]: 0.2,        // Minimal swing (anchor/slingshot)
   [DRUM_PITCHES.HIHAT_CLOSED]: 0.3, // Mostly RIGID (creates friction)
   [DRUM_PITCHES.HIHAT_OPEN]: 0.4    // Slight swing
+};
+
+/**
+ * Swing multipliers for "limp" mode - closed hi-hat gets enhanced swing
+ * Open hi-hat retains original value (serves accent/anticipation role)
+ * Based on producer feedback: 00:03:51 "Move the hats later... walking with a limp"
+ */
+export const TRACK_SWING_MULTIPLIERS_LIMP = {
+  [DRUM_PITCHES.KICK]: 1.0,
+  [DRUM_PITCHES.SNARE]: 0.2,
+  [DRUM_PITCHES.HIHAT_CLOSED]: 0.62,  // Producer's 62% swing (limp mode)
+  [DRUM_PITCHES.HIHAT_OPEN]: 0.4      // Keep original (accent/anticipation role)
+};
+
+/**
+ * Swing multipliers for "live" mode - both hi-hats get moderate swing
+ * Simulates live drummer feel where hi-hat hand rushes ahead
+ * Based on producer feedback: 00:02:12 BioBias tensor (hats rush)
+ */
+export const TRACK_SWING_MULTIPLIERS_LIVE = {
+  [DRUM_PITCHES.KICK]: 1.0,
+  [DRUM_PITCHES.SNARE]: 0.2,
+  [DRUM_PITCHES.HIHAT_CLOSED]: 0.5,   // Moderate swing (live drummer feel)
+  [DRUM_PITCHES.HIHAT_OPEN]: 0.45     // Slightly less than closed (accent role)
 };
 
 /**
@@ -79,13 +112,15 @@ export function quantizeToMPCTicks(offsetSeconds, bpm) {
 }
 
 /**
- * Calculate push/pull offset based on instrument type
+ * Calculate push/pull offset based on instrument type and hi-hat mode
  * Kick DRAGS (late), Snare ANCHORS (on-grid/early)
+ * In 'limp' mode, closed hi-hat also drags late
  * @param {number} pitch - MIDI pitch of the instrument
  * @param {number} humanizeAmount - Combined humanize amount (0-1)
+ * @param {string} hihatMode - 'friction' (default, rigid) or 'limp' (closed HH drags)
  * @returns {number} Offset in seconds
  */
-export function getPushPullOffset(pitch, humanizeAmount) {
+export function getPushPullOffset(pitch, humanizeAmount, hihatMode = 'friction') {
   let offset = 0;
 
   if (pitch === DRUM_PITCHES.KICK) {
@@ -98,11 +133,43 @@ export function getPushPullOffset(pitch, humanizeAmount) {
     // Add random variation (±20%)
     offset = baseDrag * (0.8 + Math.random() * 0.4);
   } else if (pitch === DRUM_PITCHES.SNARE) {
-    // SNARE: On-grid or slightly EARLY (negative offset = anchor/rush)
-    const maxRushMs = 10 * humanizeAmount;
-    offset = -(Math.random() * maxRushMs) / 1000;
+    // SNARE: Aggressive anchor/slingshot - always EARLY (negative offset)
+    // Range: -10ms to -25ms based on humanize amount (producer feedback: 00:03:07)
+    const minRushMs = 10;
+    const maxRushMs = 25;
+    const rushRange = maxRushMs - minRushMs;
+    const rush = minRushMs + (rushRange * humanizeAmount);
+    offset = -(Math.random() * rush) / 1000;
+  } else if (hihatMode === 'limp' && pitch === DRUM_PITCHES.HIHAT_CLOSED) {
+    // CLOSED HI-HAT in LIMP mode: Drags late like the kick (walking with a limp)
+    // +8ms to +20ms late based on humanize amount (producer feedback: 00:03:51)
+    // Open hi-hat stays rigid (accent/anticipation function)
+    const maxDragMs = 20;
+    const minDragMs = 8;
+    const dragRange = maxDragMs - minDragMs;
+    const baseDrag = (minDragMs + (dragRange * humanizeAmount)) / 1000;
+    offset = baseDrag * (0.8 + Math.random() * 0.4);
+  } else if (hihatMode === 'live') {
+    // LIVE mode: Both hi-hats RUSH (negative offset = ahead of grid)
+    // Simulates live drummer BioBias where hi-hat hand anticipates the beat
+    // (producer feedback: 00:02:12)
+    if (pitch === DRUM_PITCHES.HIHAT_CLOSED) {
+      // Closed hi-hat rushes more aggressively: -5ms to -15ms
+      const maxRushMs = 15;
+      const minRushMs = 5;
+      const rushRange = maxRushMs - minRushMs;
+      const baseRush = (minRushMs + (rushRange * humanizeAmount)) / 1000;
+      offset = -baseRush * (0.8 + Math.random() * 0.4);  // Negative = early
+    } else if (pitch === DRUM_PITCHES.HIHAT_OPEN) {
+      // Open hi-hat rushes slightly less: -3ms to -8ms (still serves accent role)
+      const maxRushMs = 8;
+      const minRushMs = 3;
+      const rushRange = maxRushMs - minRushMs;
+      const baseRush = (minRushMs + (rushRange * humanizeAmount)) / 1000;
+      offset = -baseRush * (0.8 + Math.random() * 0.4);  // Negative = early
+    }
   }
-  // Hi-hats: No push/pull offset - stay rigid for FRICTION
+  // In friction mode: Hi-hats have no push/pull offset - stay rigid for FRICTION
 
   return offset;
 }
@@ -117,15 +184,21 @@ export function getPushPullOffset(pitch, humanizeAmount) {
  * @param {Object} pitchMap - Map of track index to MIDI pitch
  * @param {number} bpm - Current tempo
  * @param {Object} trackSettings - Per-track settings (swingLocked bypasses humanization)
+ * @param {string} hihatMode - 'friction' (default) or 'limp' (closed HH drags late)
  * @returns {Object} { time: number, velocity: number }
  */
-export function getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humanizeAmount, pitchMap, bpm, trackSettings = null) {
+export function getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humanizeAmount, pitchMap, bpm, trackSettings = null, hihatMode = 'friction') {
   const defaultVelocity = 100;
   const targetPitch = pitchMap[trackIdx];
 
   // Check if track has swing locked - return grid time if so
   const isSwingLocked = trackSettings?.[trackIdx]?.swingLocked ?? false;
-  if (isSwingLocked) {
+
+  // Live mode auto-locks kick for cohesive groove (rushing hats + steady kick)
+  const isLiveModeKickLock = hihatMode === 'live' && targetPitch === DRUM_PITCHES.KICK;
+
+  // Either manually locked OR auto-locked by Live mode
+  if (isSwingLocked || isLiveModeKickLock) {
     return { time: baseTime, velocity: defaultVelocity };
   }
 
@@ -134,12 +207,26 @@ export function getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humani
     return { time: baseTime, velocity: defaultVelocity };
   }
 
-  const stepDuration = (60 / bpm) / 4;
+  // Use effective BPM capped at 96 for timing calculations
+  // At higher tempos, this preserves the groove feel by making offsets
+  // represent the same proportion of the beat as at 96 BPM
+  const effectiveBpm = Math.min(bpm, DILLA_MAX_BPM);
+  const stepDuration = (60 / effectiveBpm) / 4;
   const expectedGridTime = stepIdx * stepDuration;
-  const swingMultiplier = TRACK_SWING_MULTIPLIERS[targetPitch] || 0.5;
 
-  // 1. Push/Pull: Dilla "Drunk" Formula
-  const pushPullOffset = getPushPullOffset(targetPitch, humanizeAmount);
+  // Select swing multipliers based on mode
+  let swingMultipliers;
+  if (hihatMode === 'limp') {
+    swingMultipliers = TRACK_SWING_MULTIPLIERS_LIMP;
+  } else if (hihatMode === 'live') {
+    swingMultipliers = TRACK_SWING_MULTIPLIERS_LIVE;
+  } else {
+    swingMultipliers = TRACK_SWING_MULTIPLIERS;
+  }
+  const swingMultiplier = swingMultipliers[targetPitch] || 0.5;
+
+  // 1. Push/Pull: Dilla "Drunk" Formula (includes closed hi-hat drag in limp mode)
+  const pushPullOffset = getPushPullOffset(targetPitch, humanizeAmount, hihatMode);
 
   // 2. Tuplet swing (apply only to off-beat steps)
   let tupletSwing = 0;

@@ -44,9 +44,10 @@ function getEffectiveOffsetRatio(humanizeAmount) {
  * @param {number} bpm - Current tempo
  * @param {number} humanizeAmount - Controls ghost timing offsets and velocity (0-1)
  * @param {Object} trackSettings - Per-track ghost quantity settings
+ * @param {string} hihatMode - 'friction' (default) or 'limp' (closed HH ghosts drag late)
  * @returns {Array} Array of ghost notes to play
  */
-export function extractGhostNotes(aiSequence, originalSteps, bpm, humanizeAmount, trackSettings = null) {
+export function extractGhostNotes(aiSequence, originalSteps, bpm, humanizeAmount, trackSettings = null, hihatMode = 'friction') {
   const stepDuration = (60 / bpm) / 4; // 16th note duration
   const ghostNotes = [];
   const offsetRatio = getEffectiveOffsetRatio(humanizeAmount);
@@ -63,16 +64,16 @@ export function extractGhostNotes(aiSequence, originalSteps, bpm, humanizeAmount
     ghostNotes.push(...generateKickGhosts(originalSteps, stepDuration, offsetRatio, kickQuantity, bpm));
   }
 
-  // 3. CLOSED HI-HAT GHOSTS (track 2)
+  // 3. CLOSED HI-HAT GHOSTS (track 2) - respects hihatMode
   const closedHihatQuantity = (trackSettings?.[2]?.ghostQuantity ?? 0) / 100;
   if (closedHihatQuantity > 0) {
-    ghostNotes.push(...generateClosedHiHatGhosts(originalSteps, stepDuration, offsetRatio, closedHihatQuantity, bpm));
+    ghostNotes.push(...generateClosedHiHatGhosts(originalSteps, stepDuration, offsetRatio, closedHihatQuantity, bpm, hihatMode));
   }
 
-  // 4. OPEN HI-HAT GHOSTS (track 3)
+  // 4. OPEN HI-HAT GHOSTS (track 3) - respects hihatMode for live mode rush
   const openHihatQuantity = (trackSettings?.[3]?.ghostQuantity ?? 0) / 100;
   if (openHihatQuantity > 0) {
-    ghostNotes.push(...generateOpenHiHatGhosts(originalSteps, stepDuration, offsetRatio, openHihatQuantity, bpm));
+    ghostNotes.push(...generateOpenHiHatGhosts(originalSteps, stepDuration, offsetRatio, openHihatQuantity, bpm, hihatMode));
   }
 
   return ghostNotes;
@@ -106,12 +107,13 @@ export function generateSnareGhosts(originalSteps, stepDuration, offsetRatio, qu
         const quantizedTime = quantizeToMPCTicks(baseTime, bpm);
 
         // Velocity scales with offsetRatio (more humanize = more dynamic range)
+        // σ=22 for aggressive ghost dynamics (producer feedback: 00:08:41)
         const baseVelocity = 25 + (offsetRatio * 10);
         ghosts.push({
           pitch: DRUM_PITCHES.SNARE,
           step: preDragStep,
           startTime: quantizedTime,
-          velocity: gaussianVelocity(baseVelocity, 5)
+          velocity: gaussianVelocity(baseVelocity, 22)
         });
       }
     }
@@ -130,7 +132,7 @@ export function generateSnareGhosts(originalSteps, stepDuration, offsetRatio, qu
           pitch: DRUM_PITCHES.SNARE,
           step: postChatterStep,
           startTime: quantizedTime,
-          velocity: gaussianVelocity(baseVelocity, 4)
+          velocity: gaussianVelocity(baseVelocity, 20)
         });
       }
     }
@@ -172,12 +174,13 @@ export function generateKickGhosts(originalSteps, stepDuration, offsetRatio, qua
       const quantizedTime = quantizeToMPCTicks(baseTime, bpm);
 
       // Kick ghosts are louder than snare ghosts
+      // σ=25 for maximum "stumble" dynamics
       const baseVelocity = 60 + (offsetRatio * 15);
       ghosts.push({
         pitch: DRUM_PITCHES.KICK,
         step: candidate.step,
         startTime: quantizedTime,
-        velocity: gaussianVelocity(baseVelocity, 10)
+        velocity: gaussianVelocity(baseVelocity, 25)
       });
     }
   });
@@ -188,14 +191,16 @@ export function generateKickGhosts(originalSteps, stepDuration, offsetRatio, qua
 /**
  * Generate CLOSED HI-HAT ghost notes - the "skip"
  * Creates shuffle/friction texture that contrasts with straight main hats
+ * In limp mode, adds extra late offset to match main note drag
  * @param {Object} originalSteps - Step pattern
  * @param {number} stepDuration - Duration of one 16th note
  * @param {number} offsetRatio - Timing offset multiplier (0.3-1.0)
  * @param {number} quantity - Ghost quantity (0-1)
  * @param {number} bpm - Current tempo
+ * @param {string} hihatMode - 'friction' (default) or 'limp' (adds late drag)
  * @returns {Array} Closed hi-hat ghost notes
  */
-export function generateClosedHiHatGhosts(originalSteps, stepDuration, offsetRatio, quantity, bpm) {
+export function generateClosedHiHatGhosts(originalSteps, stepDuration, offsetRatio, quantity, bpm, hihatMode = 'friction') {
   const ghosts = [];
   const baseProbability = 0.45;
 
@@ -206,14 +211,24 @@ export function generateClosedHiHatGhosts(originalSteps, stepDuration, offsetRat
 
     if (gaussianProbability(baseProbability * quantity)) {
       const lateOffset = (15 + Math.random() * 20) / 1000 * offsetRatio;
-      const baseTime = step * stepDuration + lateOffset;
+
+      // Mode-specific offset for closed hi-hat ghosts
+      let modeOffset = 0;
+      if (hihatMode === 'limp') {
+        // Limp mode: add extra late offset (+8-12ms) to match main closed HH drag
+        modeOffset = (8 + Math.random() * 4) / 1000;
+      } else if (hihatMode === 'live') {
+        // Live mode: ghosts rush early (-5 to -10ms) like a live drummer
+        modeOffset = -(5 + Math.random() * 5) / 1000;
+      }
+      const baseTime = step * stepDuration + lateOffset + modeOffset;
 
       const baseVelocity = 25 + (offsetRatio * 10);
       ghosts.push({
         pitch: DRUM_PITCHES.HIHAT_CLOSED,
         step: step,
         startTime: quantizeToMPCTicks(baseTime, bpm),
-        velocity: gaussianVelocity(baseVelocity, 8)
+        velocity: gaussianVelocity(baseVelocity, 22)
       });
     }
   });
@@ -224,14 +239,16 @@ export function generateClosedHiHatGhosts(originalSteps, stepDuration, offsetRat
 /**
  * Generate OPEN HI-HAT ghost notes - the "slurp"
  * Creates "breathing" texture - short open hat choked by following kick
+ * In live mode, ghosts rush early like a live drummer
  * @param {Object} originalSteps - Step pattern
  * @param {number} stepDuration - Duration of one 16th note
  * @param {number} offsetRatio - Timing offset multiplier (0.3-1.0)
  * @param {number} quantity - Ghost quantity (0-1)
  * @param {number} bpm - Current tempo
+ * @param {string} hihatMode - 'friction' (default), 'limp', or 'live' (adds early rush)
  * @returns {Array} Open hi-hat ghost notes
  */
-export function generateOpenHiHatGhosts(originalSteps, stepDuration, offsetRatio, quantity, bpm) {
+export function generateOpenHiHatGhosts(originalSteps, stepDuration, offsetRatio, quantity, bpm, hihatMode = 'friction') {
   const ghosts = [];
   const baseProbability = 0.4;
 
@@ -243,14 +260,24 @@ export function generateOpenHiHatGhosts(originalSteps, stepDuration, offsetRatio
 
     if (gaussianProbability(baseProbability * quantity)) {
       const lateOffset = stepDuration * 0.15 * offsetRatio;
-      const baseTime = step * stepDuration + lateOffset;
+
+      // Mode-specific offset for open hi-hat ghosts
+      let modeOffset = 0;
+      if (hihatMode === 'live') {
+        // Live mode: ghosts rush early (-3 to -8ms) like a live drummer
+        modeOffset = -(3 + Math.random() * 5) / 1000;
+      }
+      // In friction and limp modes, open hi-hat ghosts stay on their default timing
+      // (open hi-hat serves accent/anticipation role, doesn't drag in limp mode)
+
+      const baseTime = step * stepDuration + lateOffset + modeOffset;
 
       const baseVelocity = 55 + (offsetRatio * 20);
       ghosts.push({
         pitch: DRUM_PITCHES.HIHAT_OPEN,
         step: step,
         startTime: quantizeToMPCTicks(baseTime, bpm),
-        velocity: gaussianVelocity(baseVelocity, 10)
+        velocity: gaussianVelocity(baseVelocity, 25)
       });
     }
   });

@@ -47,6 +47,10 @@ const initialState = {
     },
     steps: generateSteps(4, 16),
     humanizeValue: 0,
+    // Global groove settings
+    grooveSettings: {
+        hihatMode: 'friction'  // 'friction' (rigid hats) | 'limp' (closed HH drags late)
+    },
     // Per-track settings
     // swingLocked: if true, track stays on-grid regardless of humanize dial
     // ghostQuantity: 0-100 (controls density of ghost notes, independent of humanize dial)

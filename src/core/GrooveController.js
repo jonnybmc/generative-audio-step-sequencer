@@ -115,13 +115,15 @@ export class GrooveController {
   refreshGhostNotes() {
     const state = this.store.getState();
     const humanizeAmount = state.humanizeValue / 100;
+    const hihatMode = state.grooveSettings?.hihatMode || 'friction';
 
     this.currentGhostNotes = this.audioEngine.extractGhostNotes(
       this.currentAISequence,
       state.steps,
       state.transport.bpm,
       humanizeAmount,
-      state.trackSettings
+      state.trackSettings,
+      hihatMode
     );
   }
 
@@ -176,6 +178,26 @@ export class GrooveController {
   }
 
   /**
+   * Schedule visual sync event for ghost snare hits
+   * Uses same latency compensation as main snare, but dispatches a different event
+   * for subtle head bob animation
+   * @param {number} snareTime - AudioContext time when ghost snare plays
+   */
+  scheduleGhostSnareVisual(snareTime) {
+    const now = this.audioEngine.audioContext.currentTime;
+    const VISUAL_LATENCY_COMPENSATION = 50;
+    const delayMs = (snareTime - now) * 1000 - VISUAL_LATENCY_COMPENSATION;
+
+    if (delayMs > 0) {
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('ghost-snare-hit'));
+      }, delayMs);
+    } else {
+      window.dispatchEvent(new CustomEvent('ghost-snare-hit'));
+    }
+  }
+
+  /**
    * Handle a clock tick - plays notes for the current step
    * @param {number} currentStep - Current sequencer step (0-15)
    * @param {number} nextNoteTime - AudioContext time for the next note
@@ -185,6 +207,7 @@ export class GrooveController {
     const humanizeAmount = state.humanizeValue / 100;
     const bpm = state.transport.bpm;
     const trackSettings = state.trackSettings;
+    const hihatMode = state.grooveSettings?.hihatMode || 'friction';
     const stepDuration = (60 / bpm) / 4;
 
     // 1. Play the main pattern notes (kick, snare, hihats)
@@ -199,7 +222,8 @@ export class GrooveController {
           humanizeAmount,
           TRACK_TO_PITCH,
           bpm,
-          trackSettings
+          trackSettings,
+          hihatMode
         );
         this.audioEngine.scheduleNote(time, TRACK_TO_PITCH[trackIndex], velocity);
 
@@ -218,6 +242,8 @@ export class GrooveController {
       const MIN_OFFSET_RATIO = 0.3;
 
       const ghostsForThisStep = this.currentGhostNotes.filter(g => g.step === currentStep);
+      const SNARE_PITCH = TRACK_TO_PITCH[1];
+
       ghostsForThisStep.forEach(ghost => {
         // Check if this ghost's track is swing-locked
         const trackIndex = this.getTrackFromPitch(ghost.pitch);
@@ -233,6 +259,11 @@ export class GrooveController {
         const ghostTime = nextNoteTime + (ghostOffset * effectiveOffsetRatio);
 
         this.audioEngine.scheduleNote(ghostTime, ghost.pitch, ghost.velocity);
+
+        // Schedule visual sync for ghost snare hits (subtle head bob)
+        if (ghost.pitch === SNARE_PITCH) {
+          this.scheduleGhostSnareVisual(ghostTime);
+        }
       });
     }
   }

@@ -150,6 +150,55 @@ body {
   border-color: var(--tr909-orange);
 }
 
+/* Groove Controls (Hi-Hat Mode Toggle) */
+.groove-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.mode-label {
+  color: var(--tr909-orange);
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.mode-btn {
+  background: var(--tr909-button);
+  border: 1px solid var(--tr909-button-shadow);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  cursor: pointer;
+  color: var(--tr909-text-dark);
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 0 var(--tr909-button-shadow);
+}
+
+.mode-btn:hover {
+  background: var(--tr909-button-highlight);
+}
+
+.mode-btn.active {
+  background: var(--tr909-orange);
+  color: white;
+  border-color: #cc5500;
+  box-shadow: 0 2px 0 #cc5500, 0 0 8px var(--tr909-orange-glow);
+}
+
 /* TR-909 Style Buttons */
 #play-btn, #clear-btn {
   padding: 12px 20px;
@@ -410,4 +459,34 @@ body {
 
 .swing-lock-btn.locked .lock-icon .lock-shackle {
   transform: rotate(0deg) translateX(0);
+}
+
+/* Auto-locked state (Live mode kick lock) */
+.swing-lock-btn.auto-locked {
+  cursor: not-allowed;
+  opacity: 0.85;
+  position: relative;
+}
+
+.swing-lock-btn.auto-locked .lock-icon {
+  color: var(--tr909-orange);
+}
+
+/* "A" badge for auto-locked state */
+.swing-lock-btn.auto-locked::after {
+  content: 'A';
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  font-size: 7px;
+  font-weight: bold;
+  background: var(--tr909-orange);
+  color: white;
+  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }

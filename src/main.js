@@ -52,13 +52,40 @@ export default function Init() {
         type: "SET_TEMPO",
         payload: tempoVal,
       });
+
+      // Update animation speed based on new BPM
+      window.dispatchEvent(new CustomEvent('bpm-update', {
+        detail: { bpm: tempoVal }
+      }));
     }
   });
+
+  // Fire initial BPM event to set animation speed
+  window.dispatchEvent(new CustomEvent('bpm-update', {
+    detail: { bpm: APP_STORE.getState().transport.bpm }
+  }));
 
   // Clear pattern button handler
   document.querySelector("#clear-btn").addEventListener("click", () => {
     APP_STORE.dispatch({ type: "RESET_STEPS" });
   });
+
+  // Hi-hat mode toggle handler
+  const hihatToggle = document.querySelector("#hihat-mode-toggle");
+  if (hihatToggle) {
+    hihatToggle.addEventListener("click", (e) => {
+      const modeBtn = e.target.closest(".mode-btn");
+      if (!modeBtn) return;
+
+      const mode = modeBtn.dataset.mode;
+      APP_STORE.dispatch({ type: "SET_HIHAT_MODE", payload: mode });
+
+      // Update button active states
+      hihatToggle.querySelectorAll(".mode-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.mode === mode);
+      });
+    });
+  }
 
   // Play button handler
   const playBtn = document.querySelector("#play-btn");

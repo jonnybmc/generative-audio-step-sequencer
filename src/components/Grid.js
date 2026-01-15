@@ -38,9 +38,9 @@ export class Grid {
         return;
       }
 
-      // Handle swing lock toggle
+      // Handle swing lock toggle (but not for auto-locked buttons)
       const lockBtn = e.target.closest(".swing-lock-btn");
-      if (lockBtn) {
+      if (lockBtn && !lockBtn.disabled) {
         const track = parseInt(lockBtn.dataset.track, 10);
         this.store.dispatch({
           type: "TOGGLE_TRACK_SWING_LOCK",
@@ -62,21 +62,44 @@ export class Grid {
     // Subscribe to trackSettings changes for lock state updates
     this.store.subscribeToSelector(
       state => state.trackSettings,
-      (newTrackSettings) => this.updateLockIcons(newTrackSettings)
+      (newTrackSettings) => this.updateLockIcons()
+    );
+
+    // Subscribe to hihatMode changes for auto-lock updates
+    this.store.subscribeToSelector(
+      state => state.grooveSettings?.hihatMode,
+      () => this.updateLockIcons()
     );
   }
 
   /**
-   * Update lock icons when trackSettings change
+   * Update lock icons when trackSettings or hihatMode change
    */
-  updateLockIcons(trackSettings) {
+  updateLockIcons() {
+    const state = this.store.getState();
+    const trackSettings = state.trackSettings;
+    const hihatMode = state.grooveSettings?.hihatMode || 'friction';
+
     for (let track = 0; track < NUM_TRACKS; track++) {
       const lockBtn = this.rootElem.querySelector(`.swing-lock-btn[data-track="${track}"]`);
       if (lockBtn) {
-        const isLocked = trackSettings?.[track]?.swingLocked ?? false;
+        const isManuallyLocked = trackSettings?.[track]?.swingLocked ?? false;
+        // Kick (track 0) is auto-locked in Live mode
+        const isAutoLocked = hihatMode === 'live' && track === 0;
+        const isLocked = isManuallyLocked || isAutoLocked;
+
         lockBtn.classList.toggle('locked', isLocked);
+        lockBtn.classList.toggle('auto-locked', isAutoLocked);
+        lockBtn.disabled = isAutoLocked;
         lockBtn.innerHTML = isLocked ? LOCK_ICON_LOCKED : LOCK_ICON_UNLOCKED;
-        lockBtn.title = isLocked ? 'Unlock swing' : 'Lock swing (stay on grid)';
+
+        if (isAutoLocked) {
+          lockBtn.title = 'Kick is auto-locked in Live mode for cohesive groove';
+        } else if (isManuallyLocked) {
+          lockBtn.title = 'Unlock swing';
+        } else {
+          lockBtn.title = 'Lock swing (stay on grid)';
+        }
       }
     }
   }
@@ -112,15 +135,28 @@ export class Grid {
       }
 
       // Check if swing is locked for this track
-      const isSwingLocked = state.trackSettings?.[track]?.swingLocked ?? false;
-      const lockIcon = isSwingLocked ? LOCK_ICON_LOCKED : LOCK_ICON_UNLOCKED;
+      const isManuallyLocked = state.trackSettings?.[track]?.swingLocked ?? false;
+      const hihatMode = state.grooveSettings?.hihatMode || 'friction';
+      // Kick (track 0) is auto-locked in Live mode
+      const isAutoLocked = hihatMode === 'live' && track === 0;
+      const isLocked = isManuallyLocked || isAutoLocked;
+      const lockIcon = isLocked ? LOCK_ICON_LOCKED : LOCK_ICON_UNLOCKED;
+
+      let lockTitle;
+      if (isAutoLocked) {
+        lockTitle = 'Kick is auto-locked in Live mode for cohesive groove';
+      } else if (isManuallyLocked) {
+        lockTitle = 'Unlock swing';
+      } else {
+        lockTitle = 'Lock swing (stay on grid)';
+      }
 
       rowsHtml += `
         <div class="track-row" data-track="${track}">
           <div class="track-info">
             <span class="track-name">${TRACK_NAMES[track]}</span>
             <div class="track-controls-row">
-              <button class="swing-lock-btn ${isSwingLocked ? 'locked' : ''}" data-track="${track}" title="${isSwingLocked ? 'Unlock swing' : 'Lock swing (stay on grid)'}">
+              <button class="swing-lock-btn ${isLocked ? 'locked' : ''} ${isAutoLocked ? 'auto-locked' : ''}" data-track="${track}" title="${lockTitle}" ${isAutoLocked ? 'disabled' : ''}>
                 ${lockIcon}
               </button>
               <div class="track-dial-container" data-track="${track}"></div>
