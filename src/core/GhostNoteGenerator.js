@@ -10,9 +10,44 @@
 
 import { DRUM_PITCHES } from '../constants/drums.js';
 import { gaussianProbability, gaussianVelocity } from './MathUtils.js';
+import { AI_BLEND_CONFIG } from './HumanizeEngine.js';
 
 // Minimum timing offset ratio - ghosts are always slightly off-grid
 const MIN_OFFSET_RATIO = 0.3;
+
+/**
+ * Find nearest AI note velocity for a given pitch and step
+ * Used to inherit AI accent patterns for ghost notes
+ * @param {Object} aiSequence - The AI-generated sequence
+ * @param {number} pitch - MIDI pitch to match
+ * @param {number} step - Current step index
+ * @param {number} stepDuration - Duration of one step in seconds
+ * @param {number} defaultVelocity - Fallback velocity if no AI note found
+ * @returns {number} AI velocity or default
+ */
+function findNearestAIVelocity(aiSequence, pitch, step, stepDuration, defaultVelocity = 50) {
+  if (!aiSequence || !aiSequence.notes) return defaultVelocity;
+
+  const aiNote = aiSequence.notes.find(note => {
+    if (note.pitch !== pitch) return false;
+    const noteStep = Math.round(note.startTime / stepDuration);
+    // Look for AI notes within 1 step of the ghost position
+    return Math.abs(noteStep - step) <= 1;
+  });
+
+  return aiNote?.velocity ?? defaultVelocity;
+}
+
+/**
+ * Blend formula velocity with AI velocity
+ * @param {number} formulaVelocity - Base velocity from formula
+ * @param {number} aiVelocity - Velocity from AI sequence
+ * @returns {number} Blended velocity
+ */
+function blendGhostVelocity(formulaVelocity, aiVelocity) {
+  const weight = AI_BLEND_CONFIG.ghostVelocityWeight;
+  return (formulaVelocity * (1 - weight)) + (aiVelocity * weight);
+}
 
 /**
  * Quantize offset to MPC 3000 resolution (96 PPQN)
@@ -55,25 +90,25 @@ export function extractGhostNotes(aiSequence, originalSteps, bpm, humanizeAmount
   // 1. SNARE GHOSTS (track 1)
   const snareQuantity = (trackSettings?.[1]?.ghostQuantity ?? 0) / 100;
   if (snareQuantity > 0) {
-    ghostNotes.push(...generateSnareGhosts(originalSteps, stepDuration, offsetRatio, snareQuantity, bpm));
+    ghostNotes.push(...generateSnareGhosts(originalSteps, stepDuration, offsetRatio, snareQuantity, bpm, aiSequence));
   }
 
   // 2. KICK GHOSTS (track 0)
   const kickQuantity = (trackSettings?.[0]?.ghostQuantity ?? 0) / 100;
   if (kickQuantity > 0) {
-    ghostNotes.push(...generateKickGhosts(originalSteps, stepDuration, offsetRatio, kickQuantity, bpm));
+    ghostNotes.push(...generateKickGhosts(originalSteps, stepDuration, offsetRatio, kickQuantity, bpm, aiSequence));
   }
 
   // 3. CLOSED HI-HAT GHOSTS (track 2) - respects hihatMode
   const closedHihatQuantity = (trackSettings?.[2]?.ghostQuantity ?? 0) / 100;
   if (closedHihatQuantity > 0) {
-    ghostNotes.push(...generateClosedHiHatGhosts(originalSteps, stepDuration, offsetRatio, closedHihatQuantity, bpm, hihatMode));
+    ghostNotes.push(...generateClosedHiHatGhosts(originalSteps, stepDuration, offsetRatio, closedHihatQuantity, bpm, hihatMode, aiSequence));
   }
 
   // 4. OPEN HI-HAT GHOSTS (track 3) - respects hihatMode for live mode rush
   const openHihatQuantity = (trackSettings?.[3]?.ghostQuantity ?? 0) / 100;
   if (openHihatQuantity > 0) {
-    ghostNotes.push(...generateOpenHiHatGhosts(originalSteps, stepDuration, offsetRatio, openHihatQuantity, bpm, hihatMode));
+    ghostNotes.push(...generateOpenHiHatGhosts(originalSteps, stepDuration, offsetRatio, openHihatQuantity, bpm, hihatMode, aiSequence));
   }
 
   return ghostNotes;
@@ -87,9 +122,10 @@ export function extractGhostNotes(aiSequence, originalSteps, bpm, humanizeAmount
  * @param {number} offsetRatio - Timing offset multiplier (0.3-1.0)
  * @param {number} quantity - Ghost quantity (0-1)
  * @param {number} bpm - Current tempo
+ * @param {Object} aiSequence - AI sequence for velocity blending
  * @returns {Array} Snare ghost notes
  */
-export function generateSnareGhosts(originalSteps, stepDuration, offsetRatio, quantity, bpm) {
+export function generateSnareGhosts(originalSteps, stepDuration, offsetRatio, quantity, bpm, aiSequence = null) {
   const ghosts = [];
   const baseProbability = 0.6; // Max probability at 100% quantity
 
@@ -106,14 +142,17 @@ export function generateSnareGhosts(originalSteps, stepDuration, offsetRatio, qu
         const baseTime = preDragStep * stepDuration + lateOffset;
         const quantizedTime = quantizeToMPCTicks(baseTime, bpm);
 
-        // Velocity scales with offsetRatio (more humanize = more dynamic range)
+        // Velocity: blend formula with AI for organic accent patterns
         // σ=22 for aggressive ghost dynamics (producer feedback: 00:08:41)
-        const baseVelocity = 25 + (offsetRatio * 10);
+        const formulaVelocity = 25 + (offsetRatio * 10);
+        const aiVelocity = findNearestAIVelocity(aiSequence, DRUM_PITCHES.SNARE, preDragStep, stepDuration, formulaVelocity);
+        const blendedVelocity = blendGhostVelocity(formulaVelocity, aiVelocity);
+
         ghosts.push({
           pitch: DRUM_PITCHES.SNARE,
           step: preDragStep,
           startTime: quantizedTime,
-          velocity: gaussianVelocity(baseVelocity, 22)
+          velocity: gaussianVelocity(blendedVelocity, 22)
         });
       }
     }
@@ -127,12 +166,15 @@ export function generateSnareGhosts(originalSteps, stepDuration, offsetRatio, qu
         const baseTime = postChatterStep * stepDuration + lateOffset;
         const quantizedTime = quantizeToMPCTicks(baseTime, bpm);
 
-        const baseVelocity = 22 + (offsetRatio * 8);
+        const formulaVelocity = 22 + (offsetRatio * 8);
+        const aiVelocity = findNearestAIVelocity(aiSequence, DRUM_PITCHES.SNARE, postChatterStep, stepDuration, formulaVelocity);
+        const blendedVelocity = blendGhostVelocity(formulaVelocity, aiVelocity);
+
         ghosts.push({
           pitch: DRUM_PITCHES.SNARE,
           step: postChatterStep,
           startTime: quantizedTime,
-          velocity: gaussianVelocity(baseVelocity, 20)
+          velocity: gaussianVelocity(blendedVelocity, 20)
         });
       }
     }
@@ -149,9 +191,10 @@ export function generateSnareGhosts(originalSteps, stepDuration, offsetRatio, qu
  * @param {number} offsetRatio - Timing offset multiplier (0.3-1.0)
  * @param {number} quantity - Ghost quantity (0-1)
  * @param {number} bpm - Current tempo
+ * @param {Object} aiSequence - AI sequence for velocity blending
  * @returns {Array} Kick ghost notes
  */
-export function generateKickGhosts(originalSteps, stepDuration, offsetRatio, quantity, bpm) {
+export function generateKickGhosts(originalSteps, stepDuration, offsetRatio, quantity, bpm, aiSequence = null) {
   const ghosts = [];
   const baseProbability = 0.5; // Max probability at 100% quantity
 
@@ -175,12 +218,15 @@ export function generateKickGhosts(originalSteps, stepDuration, offsetRatio, qua
 
       // Kick ghosts are louder than snare ghosts
       // σ=25 for maximum "stumble" dynamics
-      const baseVelocity = 60 + (offsetRatio * 15);
+      const formulaVelocity = 60 + (offsetRatio * 15);
+      const aiVelocity = findNearestAIVelocity(aiSequence, DRUM_PITCHES.KICK, candidate.step, stepDuration, formulaVelocity);
+      const blendedVelocity = blendGhostVelocity(formulaVelocity, aiVelocity);
+
       ghosts.push({
         pitch: DRUM_PITCHES.KICK,
         step: candidate.step,
         startTime: quantizedTime,
-        velocity: gaussianVelocity(baseVelocity, 25)
+        velocity: gaussianVelocity(blendedVelocity, 25)
       });
     }
   });
@@ -198,9 +244,10 @@ export function generateKickGhosts(originalSteps, stepDuration, offsetRatio, qua
  * @param {number} quantity - Ghost quantity (0-1)
  * @param {number} bpm - Current tempo
  * @param {string} hihatMode - 'friction' (default) or 'limp' (adds late drag)
+ * @param {Object} aiSequence - AI sequence for velocity blending
  * @returns {Array} Closed hi-hat ghost notes
  */
-export function generateClosedHiHatGhosts(originalSteps, stepDuration, offsetRatio, quantity, bpm, hihatMode = 'friction') {
+export function generateClosedHiHatGhosts(originalSteps, stepDuration, offsetRatio, quantity, bpm, hihatMode = 'friction', aiSequence = null) {
   const ghosts = [];
   const baseProbability = 0.45;
 
@@ -223,12 +270,15 @@ export function generateClosedHiHatGhosts(originalSteps, stepDuration, offsetRat
       }
       const baseTime = step * stepDuration + lateOffset + modeOffset;
 
-      const baseVelocity = 25 + (offsetRatio * 10);
+      const formulaVelocity = 25 + (offsetRatio * 10);
+      const aiVelocity = findNearestAIVelocity(aiSequence, DRUM_PITCHES.HIHAT_CLOSED, step, stepDuration, formulaVelocity);
+      const blendedVelocity = blendGhostVelocity(formulaVelocity, aiVelocity);
+
       ghosts.push({
         pitch: DRUM_PITCHES.HIHAT_CLOSED,
         step: step,
         startTime: quantizeToMPCTicks(baseTime, bpm),
-        velocity: gaussianVelocity(baseVelocity, 22)
+        velocity: gaussianVelocity(blendedVelocity, 22)
       });
     }
   });
@@ -246,9 +296,10 @@ export function generateClosedHiHatGhosts(originalSteps, stepDuration, offsetRat
  * @param {number} quantity - Ghost quantity (0-1)
  * @param {number} bpm - Current tempo
  * @param {string} hihatMode - 'friction' (default), 'limp', or 'live' (adds early rush)
+ * @param {Object} aiSequence - AI sequence for velocity blending
  * @returns {Array} Open hi-hat ghost notes
  */
-export function generateOpenHiHatGhosts(originalSteps, stepDuration, offsetRatio, quantity, bpm, hihatMode = 'friction') {
+export function generateOpenHiHatGhosts(originalSteps, stepDuration, offsetRatio, quantity, bpm, hihatMode = 'friction', aiSequence = null) {
   const ghosts = [];
   const baseProbability = 0.4;
 
@@ -272,12 +323,15 @@ export function generateOpenHiHatGhosts(originalSteps, stepDuration, offsetRatio
 
       const baseTime = step * stepDuration + lateOffset + modeOffset;
 
-      const baseVelocity = 55 + (offsetRatio * 20);
+      const formulaVelocity = 55 + (offsetRatio * 20);
+      const aiVelocity = findNearestAIVelocity(aiSequence, DRUM_PITCHES.HIHAT_OPEN, step, stepDuration, formulaVelocity);
+      const blendedVelocity = blendGhostVelocity(formulaVelocity, aiVelocity);
+
       ghosts.push({
         pitch: DRUM_PITCHES.HIHAT_OPEN,
         step: step,
         startTime: quantizeToMPCTicks(baseTime, bpm),
-        velocity: gaussianVelocity(baseVelocity, 25)
+        velocity: gaussianVelocity(blendedVelocity, 25)
       });
     }
   });

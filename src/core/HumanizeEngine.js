@@ -17,6 +17,20 @@ import { gaussianRandom } from './MathUtils.js';
 export const DILLA_MAX_BPM = 96;
 
 /**
+ * AI blend configuration
+ * Controls how much AI variation is mixed with formula-driven timing/velocity
+ * Formula defines the Dilla signature; AI provides organic variation on top.
+ *
+ * 0.0 = pure formula (current Dilla signature)
+ * 1.0 = maximum AI influence (still formula base, AI variation layered)
+ */
+export const AI_BLEND_CONFIG = {
+  velocityWeight: 0.3,      // 30% AI velocity contribution for main hits
+  microTimingWeight: 0.5,   // 50% AI micro-timing (replaces random noise)
+  ghostVelocityWeight: 0.5  // 50% AI velocity for ghost notes (used in GhostNoteGenerator)
+};
+
+/**
  * Per-track swing multipliers - based on Dilla/MPC analysis
  * Kick swings hardest (it's the "drunk" element)
  * Hi-hats stay RIGID to create friction against lazy kick
@@ -236,34 +250,47 @@ export function getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humani
     tupletSwing = baseTupletOffset * easedHumanize * swingMultiplier * 0.15;
   }
 
-  // 3. AI sequence offset (if available)
-  let aiOffset = 0;
+  // 3. Find matching AI note (used for both timing and velocity)
+  let aiNote = null;
   if (aiSequence && aiSequence.notes) {
-    const aiNote = aiSequence.notes.find(note => {
+    aiNote = aiSequence.notes.find(note => {
       if (note.pitch !== targetPitch) return false;
       const noteClosestStep = Math.round(note.startTime / stepDuration);
       return noteClosestStep === stepIdx;
     });
-
-    if (aiNote) {
-      aiOffset = (aiNote.startTime - expectedGridTime) * humanizeAmount * swingMultiplier;
-    }
   }
 
-  // 4. Micro-variation (human inconsistency)
-  const microVariation = getMicroVariation(humanizeAmount) * swingMultiplier;
+  // 4. AI sequence offset (if available)
+  let aiOffset = 0;
+  if (aiNote) {
+    aiOffset = (aiNote.startTime - expectedGridTime) * humanizeAmount * swingMultiplier;
+  }
 
-  // 5. Combine all timing offsets
+  // 5. Micro-variation: Use AI timing noise when available, fallback to formula
+  // AI micro-timing is more organic than synthetic Math.random()
+  let microVariation = 0;
+  if (aiNote) {
+    // Extract AI timing deviation as micro-variation (capped to ±10ms for safety)
+    const aiMicroOffset = aiNote.startTime - (stepIdx * stepDuration);
+    const cappedOffset = Math.max(-0.010, Math.min(0.010, aiMicroOffset));
+    microVariation = cappedOffset * AI_BLEND_CONFIG.microTimingWeight * humanizeAmount;
+  } else {
+    // Fallback to formula-based random variation
+    microVariation = getMicroVariation(humanizeAmount) * swingMultiplier;
+  }
+
+  // 6. Combine all timing offsets
   const rawOffset = pushPullOffset + aiOffset + tupletSwing + microVariation;
 
-  // 6. Quantize to MPC 3000 resolution for authentic "chunky" feel
+  // 7. Quantize to MPC 3000 resolution for authentic "chunky" feel
   const totalOffset = quantizeToMPCTicks(rawOffset, bpm);
   const humanizedTime = baseTime + totalOffset;
 
-  // 7. Calculate velocity - Hi-hat uses AMPLITUDE MODULATION
+  // 8. Calculate velocity
   let finalVelocity = defaultVelocity;
 
   if (targetPitch === DRUM_PITCHES.HIHAT_CLOSED) {
+    // Closed hi-hat uses AMPLITUDE MODULATION (formula-driven for Dilla friction)
     const isDownbeat = (stepIdx % 4 === 0);
     const isUpbeat = (stepIdx % 4 === 2);
 
@@ -279,6 +306,12 @@ export function getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humani
 
     // Add Gaussian variation for natural feel
     finalVelocity += gaussianRandom() * 10 * humanizeAmount;
+  } else if (aiNote && aiNote.velocity && humanizeAmount > 0) {
+    // Kick, snare, open hi-hat: Blend AI velocity with formula default
+    // AI provides organic accent variation while formula maintains base level
+    const aiVelocityWeight = AI_BLEND_CONFIG.velocityWeight * humanizeAmount;
+    finalVelocity = (defaultVelocity * (1 - aiVelocityWeight)) +
+                   (aiNote.velocity * aiVelocityWeight);
   }
 
   return {
