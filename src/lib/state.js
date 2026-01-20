@@ -56,7 +56,7 @@ const initialState = {
     // ghostQuantity: 0-100 (controls density of ghost notes, independent of humanize dial)
     trackSettings: {
         0: { swingLocked: false, ghostQuantity: 0 },   // Kick: unlocked, no ghosts
-        1: { swingLocked: false, ghostQuantity: 50 },  // Snare: unlocked, 50% ghosts
+        1: { swingLocked: false, ghostQuantity: 0 },  // Snare: unlocked, 50% ghosts
         2: { swingLocked: false, ghostQuantity: 0 },   // Hi-hat closed: unlocked, no ghosts
         3: { swingLocked: false, ghostQuantity: 0 }    // Hi-hat open: unlocked, no ghosts
     }

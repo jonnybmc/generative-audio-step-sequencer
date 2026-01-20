@@ -5,6 +5,8 @@ import { GrooveController } from "./core/GrooveController.js";
 import { Grid } from "./components/Grid.js";
 import { Dial } from "./components/Dial.js";
 import { RiveAvatar } from "./components/RiveAvatar.js";
+import { SampleUploader } from "./components/SampleUploader.js";
+import { NUM_TRACKS, NUM_STEPS} from './constants/drums.js'
 
 export default function Init() {
   // Initialize core modules
@@ -15,6 +17,15 @@ export default function Init() {
   // Initialize UI components
   const GRID = new Grid(APP_STORE, "#app");
   GRID.init();
+
+ for (let track = 0; track < NUM_TRACKS;track++) {
+  new SampleUploader(
+    audioCtx,
+    AUDIO_ENGINE,
+    track,
+    `.sample-drop-zone[data-track="${track}"]` 
+  )
+ }
 
   new Dial(APP_STORE, "#humanize-container");
 

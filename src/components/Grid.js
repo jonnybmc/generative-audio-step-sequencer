@@ -152,7 +152,7 @@ export class Grid {
       }
 
       rowsHtml += `
-        <div class="track-row" data-track="${track}">
+        <div class="track-row sample-drop-zone" data-track="${track}">
           <div class="track-info">
             <span class="track-name">${TRACK_NAMES[track]}</span>
             <div class="track-controls-row">

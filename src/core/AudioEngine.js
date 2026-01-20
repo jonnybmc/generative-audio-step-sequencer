@@ -4,32 +4,34 @@
  * Uses extracted modules for humanization and ghost note generation
  */
 
-import { DRUM_PITCHES, PITCH_TO_TRACK } from '../constants/drums.js';
-import { getHumanizedNote } from './HumanizeEngine.js';
-import { extractGhostNotes } from './GhostNoteGenerator.js';
+import { DRUM_PITCHES, PITCH_TO_TRACK } from "../constants/drums.js";
+import { getHumanizedNote } from "./HumanizeEngine.js";
+import { extractGhostNotes } from "./GhostNoteGenerator.js";
 
 // Engine states
 const STATE = {
-  UNINITIALIZED: 'uninitialized',
-  LOADING: 'loading',
-  READY: 'ready',
-  ERROR: 'error'
+  UNINITIALIZED: "uninitialized",
+  LOADING: "loading",
+  READY: "ready",
+  ERROR: "error",
 };
 
 export class AudioEngine {
   constructor(audioCtx) {
     this.audioContext = audioCtx;
     this.samples = {};
+    this.defaultSamples = {};
+    this.customSamples = new Set();
     this.samplesLoaded = false;
     this.state = STATE.UNINITIALIZED;
     this.error = null;
 
     // Map MIDI pitches to sample names
     this.pitchToSample = {
-      [DRUM_PITCHES.KICK]: 'kick',
-      [DRUM_PITCHES.SNARE]: 'snare',
-      [DRUM_PITCHES.HIHAT_CLOSED]: 'hihat-closed',
-      [DRUM_PITCHES.HIHAT_OPEN]: 'hihat-open'
+      [DRUM_PITCHES.KICK]: "kick",
+      [DRUM_PITCHES.SNARE]: "snare",
+      [DRUM_PITCHES.HIHAT_CLOSED]: "hihat-closed",
+      [DRUM_PITCHES.HIHAT_OPEN]: "hihat-open",
     };
   }
 
@@ -60,37 +62,45 @@ export class AudioEngine {
     this.error = null;
 
     const sampleFiles = {
-      'kick': './samples/kick.wav',
-      'snare': './samples/snare.wav',
-      'hihat-closed': './samples/hihat-closed.wav',
-      'hihat-open': './samples/hihat-open.wav'
+      kick: "./samples/kick.wav",
+      snare: "./samples/snare.wav",
+      "hihat-closed": "./samples/hihat-closed.wav",
+      "hihat-open": "./samples/hihat-open.wav",
     };
 
     try {
-      const loadPromises = Object.entries(sampleFiles).map(async ([name, url]) => {
-        try {
-          const response = await fetch(url);
-          if (!response.ok) {
-            console.warn(`Sample not found: ${url} - using fallback oscillator`);
-            return;
+      const loadPromises = Object.entries(sampleFiles).map(
+        async ([name, url]) => {
+          // Skip if this sample was already customized
+          if (this.customSamples.has(name)) return
+          try {
+            const response = await fetch(url);
+            if (!response.ok) {
+              console.warn(
+                `Sample not found: ${url} - using fallback oscillator`,
+              );
+              return;
+            }
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer =
+              await this.audioContext.decodeAudioData(arrayBuffer);
+            this.samples[name] = audioBuffer;
+            this.defaultSamples[name] = audioBuffer;
+            console.log(`Loaded sample: ${name}`);
+          } catch (error) {
+            console.warn(`Failed to load sample ${name}:`, error);
           }
-          const arrayBuffer = await response.arrayBuffer();
-          const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-          this.samples[name] = audioBuffer;
-          console.log(`Loaded sample: ${name}`);
-        } catch (error) {
-          console.warn(`Failed to load sample ${name}:`, error);
-        }
-      });
+        },
+      );
 
       await Promise.all(loadPromises);
       this.samplesLoaded = true;
       this.state = STATE.READY;
-      console.log('All samples loaded:', Object.keys(this.samples));
+      console.log("All samples loaded:", Object.keys(this.samples));
     } catch (error) {
       this.state = STATE.ERROR;
       this.error = error;
-      console.error('Failed to load samples:', error);
+      console.error("Failed to load samples:", error);
       throw error;
     }
   }
@@ -137,11 +147,12 @@ export class AudioEngine {
     gainNode.gain.setValueAtTime(gain, time);
 
     // Velocity-to-Filter mapping (Dilla technique)
-    filterNode.type = 'lowpass';
+    filterNode.type = "lowpass";
     const minCutoff = 800;
     const maxCutoff = 20000;
     const normalizedVel = velocity / 127;
-    const cutoff = minCutoff + (maxCutoff - minCutoff) * Math.pow(normalizedVel, 2);
+    const cutoff =
+      minCutoff + (maxCutoff - minCutoff) * Math.pow(normalizedVel, 2);
 
     filterNode.frequency.setValueAtTime(cutoff, time);
     filterNode.Q.setValueAtTime(0.7, time);
@@ -160,7 +171,8 @@ export class AudioEngine {
 
     // Start playback with optional offset into sample (for micro-chops)
     // Second parameter is offset into buffer in seconds
-    source.start(time, sampleStartOffset);
+    const maxDuration = Math.min(0.25, buffer.duration);
+    source.start(time, sampleStartOffset, maxDuration);
   }
 
   /**
@@ -172,7 +184,7 @@ export class AudioEngine {
     const oscNode = this.audioContext.createOscillator();
     const gainNode = this.audioContext.createGain();
 
-    oscNode.type = 'triangle';
+    oscNode.type = "triangle";
     oscNode.frequency.setValueAtTime(frequency, time);
 
     gainNode.gain.setValueAtTime(0, time);
@@ -198,11 +210,66 @@ export class AudioEngine {
   }
 
   // Re-export methods from extracted modules for backwards compatibility
-  getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humanizeAmount, pitchMap, bpm, trackSettings = null, hihatMode = 'friction') {
-    return getHumanizedNote(trackIdx, stepIdx, baseTime, aiSequence, humanizeAmount, pitchMap, bpm, trackSettings, hihatMode);
+  getHumanizedNote(
+    trackIdx,
+    stepIdx,
+    baseTime,
+    aiSequence,
+    humanizeAmount,
+    pitchMap,
+    bpm,
+    trackSettings = null,
+    hihatMode = "friction",
+  ) {
+    return getHumanizedNote(
+      trackIdx,
+      stepIdx,
+      baseTime,
+      aiSequence,
+      humanizeAmount,
+      pitchMap,
+      bpm,
+      trackSettings,
+      hihatMode,
+    );
   }
 
-  extractGhostNotes(aiSequence, originalSteps, bpm, humanizeAmount, trackSettings = null, hihatMode = 'friction') {
-    return extractGhostNotes(aiSequence, originalSteps, bpm, humanizeAmount, trackSettings, hihatMode);
+  extractGhostNotes(
+    aiSequence,
+    originalSteps,
+    bpm,
+    humanizeAmount,
+    trackSettings = null,
+    hihatMode = "friction",
+  ) {
+    return extractGhostNotes(
+      aiSequence,
+      originalSteps,
+      bpm,
+      humanizeAmount,
+      trackSettings,
+      hihatMode,
+    );
+  }
+
+  replaceSample(audioBuffer, key) {                                                                                                                                 
+      if (Object.values(this.pitchToSample).includes(key)) {                                                                                                                                
+          this.customSamples.add(key);                                                                                                                              
+          this.samples[key] = audioBuffer;                                                                                                                          
+      } else {                                                                                                                                                      
+          return {                                                                                                                                                  
+              error: `Invalid sample key: ${key}`,                                                                                                                  
+              key                                                                                                                                                   
+          };                                                                                                                                                        
+      }                                                                                                                                                             
+  }   
+
+  resetSamples() {
+    this.samples = {...this.defaultSamples};
+    this.customSamples.clear();
+  }
+
+  hasCustomSample(key) {
+    return this.customSamples.has(key)
   }
 }
