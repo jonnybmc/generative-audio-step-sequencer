@@ -265,8 +265,8 @@ body {
 .track-info {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  align-items: start;
+  gap: 10px;
   width: 90px;
   flex-shrink: 0;
 }
@@ -275,7 +275,7 @@ body {
 .track-controls-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap:18px;
 }
 
 .track-name {
@@ -406,6 +406,7 @@ body {
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  margin-top:-10px;
 }
 
 .swing-lock-btn:hover {
@@ -489,4 +490,49 @@ body {
   align-items: center;
   justify-content: center;
   box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* ========================================
+   Reset Samples Button
+   ======================================== */
+#reset-samples-btn {
+  padding: 12px 16px;
+  background: linear-gradient(180deg, var(--tr909-button-highlight) 0%, var(--tr909-button) 40%, var(--tr909-button-shadow) 100%);
+  border: none;
+  border-radius: 4px;
+  color: var(--tr909-text-dark);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow:
+    0 4px 0 #888,
+    0 6px 8px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+  transition: all 0.1s;
+  opacity: 0.7;
+}
+
+#reset-samples-btn:hover {
+  opacity: 1;
+  background: linear-gradient(180deg, #fff 0%, var(--tr909-button-highlight) 40%, var(--tr909-button) 100%);
+}
+
+#reset-samples-btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    0 2px 0 #888,
+    0 3px 4px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+}
+
+#reset-samples-btn.has-custom {
+  opacity: 1;
+  border: 1px solid var(--tr909-orange);
+  box-shadow:
+    0 4px 0 #888,
+    0 6px 8px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.5),
+    0 0 8px var(--tr909-orange-glow);
 }

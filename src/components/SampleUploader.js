@@ -14,6 +14,11 @@ const TRACK_LABELS = {
   3: "OPEN HH",
 };
 
+// Folder icon SVG (similar to DAW sample browser)
+const FOLDER_ICON = `<svg class="folder-icon" viewBox="0 0 24 24" fill="currentColor">
+  <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+</svg>`;
+
 // Track if styles have been injected (shared across instances)
 let stylesInjected = false;
 
@@ -31,6 +36,8 @@ export class SampleUploader {
   init() {
     this.injectStyles();
     this.createOverlay();
+    this.createFileInput();
+    this.createUploadButton();
     this.setupDropZone();
     this.render();
   }
@@ -39,7 +46,7 @@ export class SampleUploader {
     if (stylesInjected) return;
     stylesInjected = true;
 
-    const style = document.createElement('style');
+    const style = document.createElement("style");
     style.textContent = `
       .sample-drop-zone {
         position: relative;
@@ -117,18 +124,159 @@ export class SampleUploader {
         0% { box-shadow: inset 0 0 0 3px #22c55e; }
         100% { box-shadow: inset 0 0 0 0px transparent; }
       }
+
+      /* Track name container with border */
+      .track-name-container {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 6px;
+        background: rgba(0, 0, 0, 0.2);
+        border: 1px solid #4a4a4a;
+        border-radius: 4px;
+        width: 85%;
+    justify-content: space-between;
+      }
+
+      /* Track name row with folder button */
+      .track-name-row {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+
+      /* Upload/folder button styles */
+      .sample-upload-btn {
+        width: 18px;
+        height: 18px;
+        padding: 2px;
+        background: transparent;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+        opacity: 0.5;
+      }
+
+      .sample-upload-btn:hover {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .sample-upload-btn:active {
+        transform: scale(0.9);
+      }
+
+      .folder-icon {
+        width: 14px;
+        height: 14px;
+        color: #888;
+        transition: color 0.15s ease;
+      }
+
+      .sample-upload-btn:hover .folder-icon {
+        color: var(--tr909-orange, #ff6a00);
+      }
+
+      /* Hide upload button during drag */
+      .sample-drop-zone.drag-over .sample-upload-btn {
+        opacity: 0;
+        pointer-events: none;
+      }
     `;
     document.head.appendChild(style);
   }
 
   createOverlay() {
-    const overlay = document.createElement('div');
-    overlay.className = 'sample-drop-overlay';
+    const overlay = document.createElement("div");
+    overlay.className = "sample-drop-overlay";
     overlay.innerHTML = `
       <span class="sample-drop-overlay-text">Drop to replace</span>
       <span class="sample-drop-overlay-track">${this.trackLabel}</span>
     `;
     this.containerElement.appendChild(overlay);
+  }
+
+  createFileInput() {
+    this.fileInput = document.createElement("input");
+    this.fileInput.type = "file";
+    this.fileInput.accept = "audio/*";
+    this.fileInput.className = "sample-file-input";
+    this.fileInput.hidden = true;
+    this.fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        this.handleFile(file);
+      }
+      // Reset input so same file can be selected again
+      this.fileInput.value = "";
+    });
+    this.containerElement.appendChild(this.fileInput);
+  }
+
+  createUploadButton() {
+    // Find the track-name element and wrap it with the folder button in a bordered container
+    const trackName = this.containerElement.querySelector(".track-name");
+    if (!trackName) return;
+
+    // Create bordered container
+    const container = document.createElement("div");
+    container.className = "track-name-container";
+
+    // Create folder button
+    const btn = document.createElement("button");
+    btn.className = "sample-upload-btn";
+    btn.title = `Load ${this.trackLabel} sample`;
+    btn.innerHTML = FOLDER_ICON;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.fileInput.click();
+    });
+
+    // Replace track-name with container holding both name and button
+    trackName.parentNode.insertBefore(container, trackName);
+    container.appendChild(trackName);
+    container.appendChild(btn);
+  }
+
+  async handleFile(file) {
+    if (!file.type.startsWith("audio")) {
+      Toast.show("Please select an audio file", "error");
+      return;
+    }
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const decodedAudio = await this.audioCtx.decodeAudioData(buffer);
+
+      if (decodedAudio.duration > 2) {
+        Toast.show("Sample truncated to 2 seconds", "warning");
+      }
+
+      this.audioEngine.replaceSample(decodedAudio, this.sampleKey);
+
+      // Notify listeners that a sample was replaced
+      window.dispatchEvent(
+        new CustomEvent("sample-replaced", {
+          detail: { sampleKey: this.sampleKey, filename: file.name },
+        }),
+      );
+
+      // Success flash animation
+      this.containerElement.classList.add("drop-success");
+      setTimeout(
+        () => this.containerElement.classList.remove("drop-success"),
+        400,
+      );
+
+      Toast.show(`${file.name} loaded`, "success");
+    } catch (error) {
+      console.error("Failed to load sample:", error);
+      Toast.show("Could not decode audio file", "error");
+    }
   }
 
   render() {}
@@ -143,7 +291,7 @@ export class SampleUploader {
   dragover(elem) {
     elem.addEventListener("dragover", (e) => {
       e.preventDefault();
-      elem.classList.add('drag-over');
+      elem.classList.add("drag-over");
     });
   }
 
@@ -151,7 +299,7 @@ export class SampleUploader {
     elem.addEventListener("dragleave", (e) => {
       // Only remove if we're actually leaving the element (not entering a child)
       if (!elem.contains(e.relatedTarget)) {
-        elem.classList.remove('drag-over');
+        elem.classList.remove("drag-over");
       }
     });
   }
@@ -159,34 +307,12 @@ export class SampleUploader {
   drop(elem) {
     elem.addEventListener("drop", async (e) => {
       e.preventDefault();
-      elem.classList.remove('drag-over');
+      elem.classList.remove("drag-over");
 
       const files = e.dataTransfer.files;
       if (files.length === 0) return;
 
-      const file = files[0];
-
-      if (file.type.startsWith("audio")) {
-        try {
-          const buffer = await file.arrayBuffer();
-          const decodedAudio = await this.audioCtx.decodeAudioData(buffer);
-          if (decodedAudio.duration > 2) {
-             Toast.show(`Sample truncated to 2 seconds`, 'warning');
-          }
-          this.audioEngine.replaceSample(decodedAudio, this.sampleKey);
-
-          // Success flash animation
-          elem.classList.add('drop-success');
-          setTimeout(() => elem.classList.remove('drop-success'), 400);
-
-          Toast.show(`${file.name} loaded`, "success");
-        } catch (error) {
-          console.error("Failed to load sample: ", error);
-          Toast.show("Could not decode audio file", "error");
-        }
-      } else {
-        Toast.show("Please drop an audio file", "error");
-      }
+      this.handleFile(files[0]);
     });
   }
 }

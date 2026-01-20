@@ -81,6 +81,7 @@
                     <input id="tempo-input" type="number" min="30" max="240" value="90" step="1" />
                 </div>
                 <button id="clear-btn">Clear Pattern</button>
+                <button id="reset-samples-btn" class="reset-samples-btn" title="Restore default samples">Reset Samples</button>
             </div>
             <div class="groove-controls">
                 <div id="hihat-mode-toggle" class="mode-toggle">
@@ -94,14 +95,15 @@
         </footer>
     </div>
 
-    <script type="module" src="./src/main.js"></script>
     <script type="importmap">
   {
     "imports": {
-      "@rive-app/canvas": "https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.34.0/+esm"
+      "@rive-app/canvas": "https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.34.0/+esm",
+      "motion": "https://cdn.jsdelivr.net/npm/motion@12.0.0/+esm"
     }
   }
 </script>
+    <script type="module" src="./src/main.js"></script>
 
 </body>
 

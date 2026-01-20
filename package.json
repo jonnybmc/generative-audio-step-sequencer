@@ -16,6 +16,7 @@
   "homepage": "https://github.com/jonnybmc/simple-sequencer#readme",
   "dependencies": {
     "@magenta/music": "^1.23.1",
-    "@rive-app/canvas": "^2.34.0"
+    "@rive-app/canvas": "^2.34.0",
+    "motion": "^12.27.5"
   }
 }

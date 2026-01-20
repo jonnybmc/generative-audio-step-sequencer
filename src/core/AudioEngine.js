@@ -71,8 +71,6 @@ export class AudioEngine {
     try {
       const loadPromises = Object.entries(sampleFiles).map(
         async ([name, url]) => {
-          // Skip if this sample was already customized
-          if (this.customSamples.has(name)) return
           try {
             const response = await fetch(url);
             if (!response.ok) {
@@ -84,8 +82,15 @@ export class AudioEngine {
             const arrayBuffer = await response.arrayBuffer();
             const audioBuffer =
               await this.audioContext.decodeAudioData(arrayBuffer);
-            this.samples[name] = audioBuffer;
+
+            // Always cache the default sample for reset functionality
             this.defaultSamples[name] = audioBuffer;
+
+            // Only set as active sample if no custom sample exists
+            if (!this.customSamples.has(name)) {
+              this.samples[name] = audioBuffer;
+            }
+
             console.log(`Loaded sample: ${name}`);
           } catch (error) {
             console.warn(`Failed to load sample ${name}:`, error);
